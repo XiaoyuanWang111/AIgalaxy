@@ -1,0 +1,32 @@
+// Component exports index - ensures proper module resolution
+export { ImageUpload } from './ImageUpload'
+export { default as MarkdownRenderer } from './MarkdownRenderer'  
+export { RichTextEditor } from './RichTextEditor'
+export { FeedbackForm } from './FeedbackForm'
+export { default as GalaxyStarSystem } from './GalaxyStarSystem'
+export { FeedbackButtons } from './FeedbackButtons'
+export { ApplicationForm } from './ApplicationForm'
+export { Danmaku } from './Danmaku'
+
+// Other components
+export { CSSStarField } from './CSSStarField'
+export { EnhancedStarField } from './EnhancedStarField'
+export { EnhancedCSSStarField } from './EnhancedCSSStarField'
+export { Galaxy3D } from './Galaxy3D'
+export { GalaxyControls } from './GalaxyControls'
+export { HybridStarField } from './HybridStarField'
+export { PlanetAgent } from './PlanetAgent'
+export { PlanetInfoPanel } from './PlanetInfoPanel'
+export { StarField } from './StarField'
+export { TrueStarsBackground } from './TrueStarsBackground'
+export { CentralStar } from './CentralStar'
+
+// Re-export UI components
+export * from './ui/badge'
+export * from './ui/button'
+export * from './ui/card'
+export * from './ui/input'
+export * from './ui/label'
+export * from './ui/select'
+export * from './ui/separator'
+export * from './ui/textarea'

@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>数据库操作测试</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .test-section {
+            background: white;
+            padding: 20px;
+            margin-bottom: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .test-title {
+            font-size: 18px;
+            font-weight: bold;
+            margin-bottom: 15px;
+            color: #333;
+        }
+        button {
+            background-color: #1890ff;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-right: 10px;
+            margin-bottom: 10px;
+        }
+        button:hover {
+            background-color: #40a9ff;
+        }
+        button:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+        .log-container {
+            background-color: #f0f2f5;
+            padding: 15px;
+            border-radius: 4px;
+            margin-top: 15px;
+            max-height: 400px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 12px;
+            white-space: pre-wrap;
+        }
+        .success {
+            color: #52c41a;
+        }
+        .error {
+            color: #ff4d4f;
+        }
+        .info {
+            color: #1890ff;
+        }
+        input, select {
+            padding: 6px 12px;
+            margin: 5px;
+            border: 1px solid #d9d9d9;
+            border-radius: 4px;
+        }
+        .agent-form {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+        .agent-form input, .agent-form select {
+            width: 100%;
+        }
+        .data-display {
+            background: #fafafa;
+            padding: 10px;
+            border-radius: 4px;
+            margin-top: 10px;
+            font-size: 12px;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body>
+    <h1>数据库操作完整测试</h1>
+    
+    <div class="test-section">
+        <div class="test-title">1. 认证状态检查</div>
+        <button onclick="checkAuth()">检查认证状态</button>
+        <button onclick="performLogin()">执行登录</button>
+        <button onclick="checkCookies()">检查Cookies</button>
+        <div id="auth-log" class="log-container"></div>
+    </div>
+
+    <div class="test-section">
+        <div class="test-title">2. 获取Agent列表</div>
+        <button onclick="getAgentsList()">获取所有Agents</button>
+        <button onclick="getFirstAgent()">获取第一个Agent详情</button>
+        <div id="list-log" class="log-container"></div>
+        <div id="agents-data" class="data-display"></div>
+    </div>
+
+    <div class="test-section">
+        <div class="test-title">3. 更新Agent测试</div>
+        <div class="agent-form">
+            <input type="text" id="update-id" placeholder="Agent ID">
+            <input type="text" id="update-name" placeholder="新名称">
+            <input type="text" id="update-description" placeholder="新描述">
+            <input type="text" id="update-tags" placeholder="新标签">
+            <input type="text" id="update-manager" placeholder="新管理员">
+            <select id="update-enabled">
+                <option value="">保持原状</option>
+                <option value="true">启用</option>
+                <option value="false">禁用</option>
+            </select>
+        </div>
+        <button onclick="updateAgent()">执行更新</button>
+        <button onclick="updateAndVerify()">更新并验证</button>
+        <div id="update-log" class="log-container"></div>
+    </div>
+
+    <div class="test-section">
+        <div class="test-title">4. 数据库直接验证</div>
+        <button onclick="verifyLastUpdate()">验证最后更新</button>
+        <button onclick="compareBeforeAfter()">对比更新前后</button>
+        <div id="verify-log" class="log-container"></div>
+    </div>
+
+    <script>
+        let lastAgentId = null;
+        let beforeUpdateData = null;
+        
+        function log(containerId, message, type = 'info') {
+            const container = document.getElementById(containerId);
+            const timestamp = new Date().toLocaleTimeString();
+            const className = type;
+            container.innerHTML += `<div class="${className}">[${timestamp}] ${message}</div>`;
+            container.scrollTop = container.scrollHeight;
+        }
+
+        async function checkAuth() {
+            try {
+                log('auth-log', '检查认证状态...');
+                const response = await fetch('/api/admin/login');
+                const data = await response.json();
+                log('auth-log', `认证状态: ${data.isAuthenticated ? '已认证' : '未认证'}`, data.isAuthenticated ? 'success' : 'error');
+                log('auth-log', `响应数据: ${JSON.stringify(data)}`);
+            } catch (error) {
+                log('auth-log', `错误: ${error.message}`, 'error');
+            }
+        }
+
+        async function performLogin() {
+            try {
+                log('auth-log', '执行登录...');
+                const response = await fetch('/api/admin/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify({ username: 'admin', password: 'admin123' })
+                });
+                const data = await response.json();
+                log('auth-log', `登录${data.success ? '成功' : '失败'}`, data.success ? 'success' : 'error');
+                if (data.token) {
+                    log('auth-log', `Token: ${data.token.substring(0, 20)}...`);
+                }
+            } catch (error) {
+                log('auth-log', `错误: ${error.message}`, 'error');
+            }
+        }
+
+        async function checkCookies() {
+            log('auth-log', `当前Cookies: ${document.cookie || '无'}`);
+        }
+
+        async function getAgentsList() {
+            try {
+                log('list-log', '获取Agents列表...');
+                const response = await fetch('/api/agents');
+                const data = await response.json();
+                log('list-log', `获取到 ${data.agents?.length || 0} 个Agents`, 'success');
+                
+                if (data.agents && data.agents.length > 0) {
+                    lastAgentId = data.agents[0].id;
+                    document.getElementById('update-id').value = lastAgentId;
+                    document.getElementById('agents-data').innerHTML = JSON.stringify(data.agents, null, 2);
+                }
+            } catch (error) {
+                log('list-log', `错误: ${error.message}`, 'error');
+            }
+        }
+
+        async function getFirstAgent() {
+            try {
+                if (!lastAgentId) {
+                    log('list-log', '请先获取Agents列表', 'error');
+                    return;
+                }
+                log('list-log', `获取Agent详情: ${lastAgentId}`);
+                const response = await fetch(`/api/agents/${lastAgentId}`);
+                const data = await response.json();
+                log('list-log', '获取成功', 'success');
+                document.getElementById('agents-data').innerHTML = JSON.stringify(data.agent, null, 2);
+                
+                // 填充表单
+                if (data.agent) {
+                    document.getElementById('update-name').value = data.agent.name || '';
+                    document.getElementById('update-description').value = data.agent.description || '';
+                    document.getElementById('update-tags').value = data.agent.tags || '';
+                    document.getElementById('update-manager').value = data.agent.manager || '';
+                }
+            } catch (error) {
+                log('list-log', `错误: ${error.message}`, 'error');
+            }
+        }
+
+        async function updateAgent() {
+            try {
+                const id = document.getElementById('update-id').value;
+                if (!id) {
+                    log('update-log', '请输入Agent ID', 'error');
+                    return;
+                }
+                
+                const updateData = {};
+                const name = document.getElementById('update-name').value;
+                const description = document.getElementById('update-description').value;
+                const tags = document.getElementById('update-tags').value;
+                const manager = document.getElementById('update-manager').value;
+                const enabled = document.getElementById('update-enabled').value;
+                
+                if (name) updateData.name = name;
+                if (description) updateData.description = description;
+                if (tags) updateData.tags = tags;
+                if (manager) updateData.manager = manager;
+                if (enabled) updateData.enabled = enabled === 'true';
+                
+                log('update-log', `更新Agent ${id}`);
+                log('update-log', `更新数据: ${JSON.stringify(updateData)}`);
+                
+                const response = await fetch(`/api/agents/${id}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify(updateData)
+                });
+                
+                log('update-log', `响应状态: ${response.status}`);
+                const data = await response.json();
+                log('update-log', `响应数据: ${JSON.stringify(data)}`, response.ok ? 'success' : 'error');
+                
+                // 检查控制台日志
+                if (response.ok) {
+                    log('update-log', '请检查服务器控制台查看详细日志', 'info');
+                }
+            } catch (error) {
+                log('update-log', `错误: ${error.message}`, 'error');
+            }
+        }
+
+        async function updateAndVerify() {
+            try {
+                const id = document.getElementById('update-id').value;
+                if (!id) {
+                    log('update-log', '请输入Agent ID', 'error');
+                    return;
+                }
+                
+                // 获取更新前数据
+                log('update-log', '获取更新前数据...');
+                const beforeResponse = await fetch(`/api/agents/${id}`);
+                beforeUpdateData = await beforeResponse.json();
+                log('update-log', `更新前: ${JSON.stringify(beforeUpdateData.agent, null, 2)}`);
+                
+                // 执行更新
+                await updateAgent();
+                
+                // 等待一秒
+                await new Promise(resolve => setTimeout(resolve, 1000));
+                
+                // 获取更新后数据
+                log('update-log', '获取更新后数据...');
+                const afterResponse = await fetch(`/api/agents/${id}`);
+                const afterData = await afterResponse.json();
+                log('update-log', `更新后: ${JSON.stringify(afterData.agent, null, 2)}`);
+                
+                // 对比差异
+                if (beforeUpdateData && afterData) {
+                    log('update-log', '=== 数据对比 ===', 'info');
+                    const before = beforeUpdateData.agent;
+                    const after = afterData.agent;
+                    
+                    ['name', 'description', 'tags', 'manager', 'enabled'].forEach(field => {
+                        if (before[field] !== after[field]) {
+                            log('update-log', `${field}: "${before[field]}" → "${after[field]}"`, 'success');
+                        }
+                    });
+                }
+            } catch (error) {
+                log('update-log', `错误: ${error.message}`, 'error');
+            }
+        }
+
+        async function verifyLastUpdate() {
+            try {
+                const id = document.getElementById('update-id').value;
+                if (!id) {
+                    log('verify-log', '请输入Agent ID', 'error');
+                    return;
+                }
+                
+                log('verify-log', '直接查询数据库...');
+                const response = await fetch(`/api/agents/${id}`);
+                const data = await response.json();
+                
+                log('verify-log', '当前数据库中的数据:');
+                log('verify-log', JSON.stringify(data.agent, null, 2));
+                
+                // 再次刷新列表验证
+                log('verify-log', '刷新列表验证...');
+                const listResponse = await fetch('/api/agents');
+                const listData = await listResponse.json();
+                const agent = listData.agents?.find(a => a.id === id);
+                
+                if (agent) {
+                    log('verify-log', '列表中的数据:');
+                    log('verify-log', JSON.stringify(agent, null, 2));
+                } else {
+                    log('verify-log', '在列表中未找到该Agent', 'error');
+                }
+            } catch (error) {
+                log('verify-log', `错误: ${error.message}`, 'error');
+            }
+        }
+
+        async function compareBeforeAfter() {
+            if (!beforeUpdateData) {
+                log('verify-log', '请先执行"更新并验证"', 'error');
+                return;
+            }
+            
+            const id = document.getElementById('update-id').value;
+            try {
+                const response = await fetch(`/api/agents/${id}`);
+                const currentData = await response.json();
+                
+                log('verify-log', '=== 详细对比 ===', 'info');
+                log('verify-log', '更新前:');
+                log('verify-log', JSON.stringify(beforeUpdateData.agent, null, 2));
+                log('verify-log', '当前:');
+                log('verify-log', JSON.stringify(currentData.agent, null, 2));
+            } catch (error) {
+                log('verify-log', `错误: ${error.message}`, 'error');
+            }
+        }
+        
+        // 页面加载时自动执行
+        window.onload = async function() {
+            await checkAuth();
+            await getAgentsList();
+        };
+    </script>
+</body>
+</html>

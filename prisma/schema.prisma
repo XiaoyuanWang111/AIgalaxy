@@ -1,0 +1,177 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum ApplicationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum UserRole {
+  USER
+  ADMIN
+}
+
+enum AdminRole {
+  ADMIN
+  SUPER_ADMIN
+}
+
+model Agent {
+  id          String   @id @default(cuid())
+  name        String
+  description String
+  tags        String[] // PostgreSQL supports arrays
+  manager     String
+  guideUrl    String?  @map("guide_url")
+  homepage    String?
+  icon        String?
+  coverImage  String?  @map("cover_image")
+  guideContent String? @map("guide_content")
+  themeColor  String?  @default("#FFFFFF") @map("theme_color") // 星球主题颜色
+  enabled     Boolean  @default(true) // 是否可见（显示在前端）
+  clickCount  Int      @default(0) @map("click_count")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  applications AgentApplication[]
+  feedback     AgentFeedback[]
+
+  @@map("agents")
+}
+
+model AgentApplication {
+  id            String   @id @default(cuid())
+  agentId       String   @map("agent_id")
+  applicantName String   @map("applicant_name")
+  email         String
+  reason        String?
+  status        ApplicationStatus @default(PENDING)
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  agent Agent @relation(fields: [agentId], references: [id], onDelete: Cascade)
+
+  @@map("agent_applications")
+}
+
+model AgentFeedback {
+  id        String   @id @default(cuid())
+  agentId   String   @map("agent_id")
+  userName  String   @map("user_name")
+  email     String?
+  score     Int      @default(5) // 1-5 评分
+  comment   String?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  // Relations
+  agent Agent @relation(fields: [agentId], references: [id], onDelete: Cascade)
+
+  @@map("agent_feedback")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String?
+  role      UserRole @default(USER)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("users")
+}
+
+model Admin {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String
+  name      String
+  role      AdminRole @default(ADMIN)
+  canChangePassword Boolean @default(false) @map("can_change_password") // 是否可以修改密码
+  canManageAdmins   Boolean @default(false) @map("can_manage_admins")   // 是否可以管理管理员
+  createdBy String?  @map("created_by") // 创建者ID
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("admins")
+}
+
+model FeedbackConfig {
+  id               String   @id @default(cuid())
+  productFeedbackUrl String @map("product_feedback_url")
+  platformFeedbackUrl String @map("platform_feedback_url")
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  @@map("feedback_config")
+}
+
+model FeedbackButton {
+  id          String   @id @default(cuid())
+  title       String
+  description String?
+  url         String
+  icon        String?  // 图标类型，如 'message', 'form', 'survey' 等
+  color       String?  // 按钮颜色，如 '#1890ff'
+  order       Int      @default(0) // 排序顺序
+  enabled     Boolean  @default(true)
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@map("feedback_buttons")
+}
+
+model StarMagnitudeConfig {
+  id              String  @id @default(cuid())
+  magnitude       Int     // 星等值 (1-7)
+  minClicks       Int     // 最小点击次数门槛
+  maxClicks       Int?    // 最大点击次数门槛 (null表示无上限)
+  size            Float   // 星星大小
+  brightness      Float   // 亮度值 (0-1)
+  glow            Float   // 光晕大小
+  color           String  // 默认颜色
+  label           String  // 显示标签
+  description     String? // 描述
+  isEnabled       Boolean @default(true)
+  orderIndex      Int     // 排序
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  @@unique([magnitude])
+  @@index([isEnabled])
+  @@map("star_magnitude_configs")
+}
+
+model Danmaku {
+  id        String   @id @default(cuid())
+  text      String
+  color     String   @default("#FFFFFF")
+  ipAddress String?  @map("ip_address")
+  userAgent String?  @map("user_agent")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("danmakus")
+}
+
+model DanmakuConfig {
+  id        String   @id @default(cuid())
+  enabled   Boolean  @default(true)
+  maxLength Int      @default(20)
+  playSpeed Float    @default(1.0)
+  batchSize Int      @default(10)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("danmaku_config")
+}

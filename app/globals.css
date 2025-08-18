@@ -1,0 +1,191 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Galaxy Theme Global Styles */
+body {
+  background: #000510;
+  overflow-x: hidden;
+}
+
+/* Ant Design Select Dropdown Styling for Galaxy Theme */
+.galaxy-select-dropdown .ant-select-item {
+  color: rgba(255, 255, 255, 0.9) !important;
+  background: transparent !important;
+}
+
+.galaxy-select-dropdown .ant-select-item:hover {
+  background: rgba(255, 255, 255, 0.1) !important;
+}
+
+.galaxy-select-dropdown .ant-select-item-option-selected {
+  background: rgba(74, 172, 254, 0.3) !important;
+}
+
+/* Input and Select Base Styling */
+.ant-input, .ant-select-selector {
+  background: rgba(255, 255, 255, 0.1) !important;
+  border: 1px solid rgba(255, 255, 255, 0.2) !important;
+  color: white !important;
+  backdrop-filter: blur(10px) !important;
+}
+
+.ant-input::placeholder {
+  color: rgba(255, 255, 255, 0.5) !important;
+}
+
+.ant-select-arrow {
+  color: rgba(255, 255, 255, 0.6) !important;
+}
+
+/* Button Hover Effects */
+.ant-btn:hover {
+  transform: translateY(-1px) !important;
+  box-shadow: 0 8px 25px rgba(255, 255, 255, 0.2) !important;
+}
+
+/* Loading Spinner */
+.ant-spin-dot-item {
+  background-color: rgba(255, 255, 255, 0.8) !important;
+}
+
+/* Card Hover Effects */
+.ant-card:hover {
+  transform: translateY(-2px) !important;
+  box-shadow: 0 12px 30px rgba(255, 255, 255, 0.15) !important;
+  transition: all 0.3s ease !important;
+}
+
+/* Scrollbar Styling */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.3);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.5);
+}
+
+/* Animation Keyframes */
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+@keyframes glow {
+  0%, 100% {
+    box-shadow: 0 0 20px rgba(255, 255, 255, 0.3);
+  }
+  50% {
+    box-shadow: 0 0 30px rgba(255, 255, 255, 0.6);
+  }
+}
+
+@keyframes rotate {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Galaxy Text Effect */
+.galaxy-title {
+  background: linear-gradient(45deg, #ffffff, #a8e6cf, #88d8c0);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  animation: glow 3s ease-in-out infinite;
+}
+
+/* Mobile Responsive */
+@media (max-width: 768px) {
+  .ant-space {
+    flex-wrap: wrap !important;
+    justify-content: center !important;
+  }
+  
+  .ant-statistic {
+    text-align: center !important;
+  }
+}
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 222.2 84% 4.9%;
+    --card: 0 0% 100%;
+    --card-foreground: 222.2 84% 4.9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222.2 84% 4.9%;
+    --primary: 221.2 83.2% 53.3%;
+    --primary-foreground: 210 40% 98%;
+    --secondary: 210 40% 96%;
+    --secondary-foreground: 222.2 47.4% 11.2%;
+    --muted: 210 40% 96%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+    --accent: 210 40% 96%;
+    --accent-foreground: 222.2 47.4% 11.2%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 221.2 83.2% 53.3%;
+    --radius: 0.5rem;
+  }
+
+  .dark {
+    --background: 222.2 84% 4.9%;
+    --foreground: 210 40% 98%;
+    --card: 222.2 84% 4.9%;
+    --card-foreground: 210 40% 98%;
+    --popover: 222.2 84% 4.9%;
+    --popover-foreground: 210 40% 98%;
+    --primary: 217.2 91.2% 59.8%;
+    --primary-foreground: 222.2 47.4% 11.2%;
+    --secondary: 217.2 32.6% 17.5%;
+    --secondary-foreground: 210 40% 98%;
+    --muted: 217.2 32.6% 17.5%;
+    --muted-foreground: 215 20.2% 65.1%;
+    --accent: 217.2 32.6% 17.5%;
+    --accent-foreground: 210 40% 98%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 217.2 32.6% 17.5%;
+    --input: 217.2 32.6% 17.5%;
+    --ring: 224.3 76.3% 94.1%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}

@@ -1,0 +1,24 @@
+# Vercel ignore file
+# Force cache refresh by changing this file
+
+# Ignore files
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Ignore backup directories
+cleanup-backups
+cleanup-reports
+cleanup-scripts
+project-cleanup-backup
+
+# Ignore duplicate subdirectory
+ai-agent-platform
+
+# Build artifacts
+.next
+out
+dist
+
+# Cache refresh marker: v2.1.4

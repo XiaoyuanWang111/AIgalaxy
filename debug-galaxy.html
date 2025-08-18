@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Galaxy Debug</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: #000;
+            color: white;
+            font-family: Arial, sans-serif;
+        }
+        .debug-container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            overflow: hidden;
+        }
+        .star {
+            position: absolute;
+            border-radius: 50%;
+            background: radial-gradient(circle, white, transparent);
+            z-index: 1000;
+        }
+        .debug-info {
+            position: fixed;
+            top: 10px;
+            left: 10px;
+            background: rgba(0,0,0,0.8);
+            padding: 10px;
+            border-radius: 5px;
+            z-index: 2000;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div class="debug-container" id="container">
+        <div class="debug-info" id="debugInfo">
+            <div>Window size: <span id="windowSize"></span></div>
+            <div>Stars rendered: <span id="starCount">0</span></div>
+            <div>Stars visible: <span id="visibleCount">0</span></div>
+        </div>
+    </div>
+
+    <script>
+        const agents = [
+            { id: "cmda4zyno0006deb7lpr1su5k", name: "Perplexity AI", enabled: true, clickCount: 0 },
+            { id: "cmda4zyno0007deb7p0phqe99", name: "Notion AI", enabled: true, clickCount: 2 },
+            { id: "cmda4zynn0004deb7fere53j1", name: "Midjourney", enabled: true, clickCount: 0 },
+            { id: "cmda4zyno0005deb7c2ocvrq1", name: "Cursor IDE", enabled: true, clickCount: 0 },
+            { id: "cmda4zynk0003deb7vm4yxkrs", name: "ChatGPT Plus", enabled: true, clickCount: 0 },
+            { id: "cmda4zynj0002deb79ttn73fq", name: "Claude Code", enabled: true, clickCount: 0 }
+        ];
+
+        function generateStarPositions(agents) {
+            return agents.map((agent, index) => {
+                const hash = agent.id.split('').reduce((a, b) => {
+                    a = ((a << 5) - a) + b.charCodeAt(0)
+                    return a & a
+                }, 0)
+                
+                const angle1 = (hash % 360) * Math.PI / 180
+                const angle2 = ((hash * 7) % 180 - 90) * Math.PI / 180
+                const distance = 300 + (hash % 400)
+                
+                return {
+                    agent,
+                    x: Math.cos(angle1) * Math.cos(angle2) * distance,
+                    y: Math.sin(angle2) * distance,
+                    z: Math.sin(angle1) * Math.cos(angle2) * distance
+                }
+            });
+        }
+
+        function project3D(star, rotateX = -20, rotateY = 0, zoom = 1) {
+            const radX = rotateX * Math.PI / 180
+            const radY = rotateY * Math.PI / 180
+            
+            let x = star.x
+            let y = star.y * Math.cos(radX) - star.z * Math.sin(radX)
+            let z = star.y * Math.sin(radX) + star.z * Math.cos(radX)
+            
+            const nx = x * Math.cos(radY) + z * Math.sin(radY)
+            const nz = -x * Math.sin(radY) + z * Math.cos(radY)
+            
+            const distance = 800
+            const scale = distance / (distance + nz) * zoom
+            
+            return {
+                x: nx * scale + window.innerWidth / 2,
+                y: y * scale + window.innerHeight / 2,
+                scale: Math.max(0.1, scale),
+                z: nz
+            }
+        }
+
+        function renderStars() {
+            const container = document.getElementById('container');
+            const windowSizeEl = document.getElementById('windowSize');
+            const starCountEl = document.getElementById('starCount');
+            const visibleCountEl = document.getElementById('visibleCount');
+            
+            // Clear existing stars
+            const existingStars = container.querySelectorAll('.star');
+            existingStars.forEach(star => star.remove());
+            
+            const starPositions = generateStarPositions(agents);
+            let visibleCount = 0;
+            
+            starPositions.forEach((star, index) => {
+                const projected = project3D(star);
+                const size = 10 * projected.scale; // Base size of 10px
+                
+                // Check if star is visible
+                const isVisible = projected.x >= -size && 
+                                 projected.x <= window.innerWidth + size &&
+                                 projected.y >= -size && 
+                                 projected.y <= window.innerHeight + size;
+                
+                if (isVisible) {
+                    visibleCount++;
+                }
+                
+                const starElement = document.createElement('div');
+                starElement.className = 'star';
+                starElement.style.left = (projected.x - size/2) + 'px';
+                starElement.style.top = (projected.y - size/2) + 'px';
+                starElement.style.width = size + 'px';
+                starElement.style.height = size + 'px';
+                starElement.style.boxShadow = `0 0 ${size}px white`;
+                starElement.title = `${star.agent.name} - Pos: (${projected.x.toFixed(1)}, ${projected.y.toFixed(1)}) - ${isVisible ? 'VISIBLE' : 'HIDDEN'}`;
+                starElement.style.opacity = isVisible ? '1' : '0.3';
+                starElement.style.border = isVisible ? '2px solid lime' : '2px solid red';
+                
+                container.appendChild(starElement);
+            });
+            
+            windowSizeEl.textContent = `${window.innerWidth} x ${window.innerHeight}`;
+            starCountEl.textContent = starPositions.length;
+            visibleCountEl.textContent = visibleCount;
+            
+            console.log('Stars rendered:', starPositions.length);
+            console.log('Stars visible:', visibleCount);
+            
+            starPositions.forEach((star, index) => {
+                const projected = project3D(star);
+                console.log(`${star.agent.name}: (${projected.x.toFixed(1)}, ${projected.y.toFixed(1)}) - ${projected.x >= 0 && projected.x <= window.innerWidth && projected.y >= 0 && projected.y <= window.innerHeight ? 'VISIBLE' : 'OUTSIDE'}`);
+            });
+        }
+
+        // Initial render
+        renderStars();
+        
+        // Re-render on window resize
+        window.addEventListener('resize', renderStars);
+        
+        // Re-render every 100ms to check for any changes
+        setInterval(renderStars, 1000);
+    </script>
+</body>
+</html>

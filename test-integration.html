@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>集成测试</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .test-section { margin: 20px 0; padding: 15px; border: 1px solid #ccc; }
+        .success { color: green; }
+        .error { color: red; }
+        button { padding: 10px 15px; margin: 5px; }
+        textarea { width: 100%; height: 100px; margin: 10px 0; }
+    </style>
+</head>
+<body>
+    <h1>AI Agent Platform 集成测试</h1>
+    
+    <div class="test-section">
+        <h2>1. 数据库连接测试</h2>
+        <button onclick="testDatabaseConnection()">测试数据库连接</button>
+        <div id="db-result"></div>
+    </div>
+    
+    <div class="test-section">
+        <h2>2. 管理员登录测试</h2>
+        <button onclick="testAdminLogin()">测试管理员登录</button>
+        <div id="login-result"></div>
+    </div>
+    
+    <div class="test-section">
+        <h2>3. 工具管理测试</h2>
+        <button onclick="testCreateAgent()">创建测试工具</button>
+        <button onclick="testGetAgents()">获取所有工具</button>
+        <div id="agent-result"></div>
+    </div>
+    
+    <div class="test-section">
+        <h2>4. 按钮配置测试</h2>
+        <button onclick="testCreateButton()">创建测试按钮（需要登录）</button>
+        <button onclick="testGetButtons()">获取所有按钮</button>
+        <div id="button-result"></div>
+    </div>
+    
+    <div class="test-section">
+        <h2>5. 产品评分测试</h2>
+        <button onclick="testSubmitFeedback()">提交测试评分</button>
+        <button onclick="testGetFeedback()">获取所有评分</button>
+        <div id="feedback-result"></div>
+    </div>
+    
+    <div class="test-section">
+        <h2>6. 弹幕测试</h2>
+        <button onclick="testSendDanmaku()">发送测试弹幕</button>
+        <button onclick="testGetDanmaku()">获取弹幕列表</button>
+        <div id="danmaku-result"></div>
+    </div>
+    
+    <div class="test-section">
+        <h2>测试日志</h2>
+        <textarea id="test-log" readonly></textarea>
+        <button onclick="clearLog()">清空日志</button>
+    </div>
+
+    <script>
+        let authToken = null;
+        
+        function log(message) {
+            const logArea = document.getElementById('test-log');
+            logArea.value += new Date().toLocaleTimeString() + ': ' + message + '\\n';
+            logArea.scrollTop = logArea.scrollHeight;
+        }
+        
+        function clearLog() {
+            document.getElementById('test-log').value = '';
+        }
+        
+        async function testDatabaseConnection() {
+            try {
+                const response = await fetch('/api/health');
+                const result = await response.json();
+                document.getElementById('db-result').innerHTML = 
+                    `<span class="success">✓ 数据库连接正常</span><pre>${JSON.stringify(result, null, 2)}</pre>`;
+                log('数据库连接测试通过');
+            } catch (error) {
+                document.getElementById('db-result').innerHTML = 
+                    `<span class="error">✗ 数据库连接失败: ${error.message}</span>`;
+                log('数据库连接测试失败: ' + error.message);
+            }
+        }
+        
+        async function testAdminLogin() {
+            try {
+                const response = await fetch('/api/admin/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify({
+                        email: 'admin@example.com',
+                        password: 'admin123'
+                    })
+                });
+                const result = await response.json();
+                document.getElementById('login-result').innerHTML = 
+                    `<span class="success">✓ 管理员登录成功</span><pre>${JSON.stringify(result, null, 2)}</pre>`;
+                log('管理员登录测试通过');
+            } catch (error) {
+                document.getElementById('login-result').innerHTML = 
+                    `<span class="error">✗ 管理员登录失败: ${error.message}</span>`;
+                log('管理员登录测试失败: ' + error.message);
+            }
+        }
+        
+        async function testCreateAgent() {
+            try {
+                const response = await fetch('/api/agents', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify({
+                        name: '集成测试工具',
+                        description: '这是通过前端集成测试创建的工具',
+                        tags: ['Test', 'Frontend', 'Integration'],
+                        manager: '测试用户',
+                        enabled: true
+                    })
+                });
+                const result = await response.json();
+                document.getElementById('agent-result').innerHTML = 
+                    `<span class="success">✓ 工具创建成功</span><pre>${JSON.stringify(result, null, 2)}</pre>`;
+                log('工具创建测试通过');
+            } catch (error) {
+                document.getElementById('agent-result').innerHTML = 
+                    `<span class="error">✗ 工具创建失败: ${error.message}</span>`;
+                log('工具创建测试失败: ' + error.message);
+            }
+        }
+        
+        async function testGetAgents() {
+            try {
+                const response = await fetch('/api/agents');
+                const result = await response.json();
+                document.getElementById('agent-result').innerHTML = 
+                    `<span class="success">✓ 获取工具列表成功 (${result.agents.length}个工具)</span><pre>${JSON.stringify(result, null, 2)}</pre>`;
+                log(`获取工具列表成功: ${result.agents.length}个工具`);
+            } catch (error) {
+                document.getElementById('agent-result').innerHTML = 
+                    `<span class="error">✗ 获取工具列表失败: ${error.message}</span>`;
+                log('获取工具列表失败: ' + error.message);
+            }
+        }
+        
+        async function testCreateButton() {
+            try {
+                const response = await fetch('/api/feedback-buttons', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify({
+                        title: '集成测试按钮',
+                        description: '通过前端测试创建的按钮',
+                        url: 'https://test.example.com',
+                        icon: 'test',
+                        color: '#00ff00',
+                        order: 99,
+                        enabled: true
+                    })
+                });
+                const result = await response.json();
+                if (response.ok) {
+                    document.getElementById('button-result').innerHTML = 
+                        `<span class="success">✓ 按钮创建成功</span><pre>${JSON.stringify(result, null, 2)}</pre>`;
+                    log('按钮创建测试通过');
+                } else {
+                    throw new Error(result.error || '创建失败');
+                }
+            } catch (error) {
+                document.getElementById('button-result').innerHTML = 
+                    `<span class="error">✗ 按钮创建失败: ${error.message}</span>`;
+                log('按钮创建测试失败: ' + error.message);
+            }
+        }
+        
+        async function testGetButtons() {
+            try {
+                const response = await fetch('/api/feedback-buttons');
+                const result = await response.json();
+                document.getElementById('button-result').innerHTML = 
+                    `<span class="success">✓ 获取按钮列表成功 (${result.buttons.length}个按钮)</span><pre>${JSON.stringify(result, null, 2)}</pre>`;
+                log(`获取按钮列表成功: ${result.buttons.length}个按钮`);
+            } catch (error) {
+                document.getElementById('button-result').innerHTML = 
+                    `<span class="error">✗ 获取按钮列表失败: ${error.message}</span>`;
+                log('获取按钮列表失败: ' + error.message);
+            }
+        }
+        
+        async function testSubmitFeedback() {
+            try {
+                // 先获取一个agent ID
+                const agentsResponse = await fetch('/api/agents');
+                const agentsData = await agentsResponse.json();
+                if (agentsData.agents.length === 0) {
+                    throw new Error('没有可用的工具进行评分测试');
+                }
+                
+                const agentId = agentsData.agents[0].id;
+                const response = await fetch('/api/feedback', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        agentId: agentId,
+                        userName: '集成测试用户',
+                        email: 'test@example.com',
+                        score: 5,
+                        comment: '这是通过集成测试提交的评分'
+                    })
+                });
+                const result = await response.json();
+                document.getElementById('feedback-result').innerHTML = 
+                    `<span class="success">✓ 评分提交成功</span><pre>${JSON.stringify(result, null, 2)}</pre>`;
+                log('评分提交测试通过');
+            } catch (error) {
+                document.getElementById('feedback-result').innerHTML = 
+                    `<span class="error">✗ 评分提交失败: ${error.message}</span>`;
+                log('评分提交测试失败: ' + error.message);
+            }
+        }
+        
+        async function testGetFeedback() {
+            try {
+                const response = await fetch('/api/feedback');
+                const result = await response.json();
+                document.getElementById('feedback-result').innerHTML = 
+                    `<span class="success">✓ 获取评分列表成功 (${result.feedback.length}条评分)</span><pre>${JSON.stringify(result, null, 2)}</pre>`;
+                log(`获取评分列表成功: ${result.feedback.length}条评分`);
+            } catch (error) {
+                document.getElementById('feedback-result').innerHTML = 
+                    `<span class="error">✗ 获取评分列表失败: ${error.message}</span>`;
+                log('获取评分列表失败: ' + error.message);
+            }
+        }
+        
+        async function testSendDanmaku() {
+            try {
+                const response = await fetch('/api/danmaku', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        content: '集成测试弹幕消息',
+                        userName: '测试用户'
+                    })
+                });
+                const result = await response.json();
+                document.getElementById('danmaku-result').innerHTML = 
+                    `<span class="success">✓ 弹幕发送成功</span><pre>${JSON.stringify(result, null, 2)}</pre>`;
+                log('弹幕发送测试通过');
+            } catch (error) {
+                document.getElementById('danmaku-result').innerHTML = 
+                    `<span class="error">✗ 弹幕发送失败: ${error.message}</span>`;
+                log('弹幕发送测试失败: ' + error.message);
+            }
+        }
+        
+        async function testGetDanmaku() {
+            try {
+                const response = await fetch('/api/danmaku');
+                const result = await response.json();
+                document.getElementById('danmaku-result').innerHTML = 
+                    `<span class="success">✓ 获取弹幕列表成功 (${result.danmaku.length}条弹幕)</span><pre>${JSON.stringify(result, null, 2)}</pre>`;
+                log(`获取弹幕列表成功: ${result.danmaku.length}条弹幕`);
+            } catch (error) {
+                document.getElementById('danmaku-result').innerHTML = 
+                    `<span class="error">✗ 获取弹幕列表失败: ${error.message}</span>`;
+                log('获取弹幕列表失败: ' + error.message);
+            }
+        }
+        
+        // 页面加载时自动运行基础测试
+        window.onload = function() {
+            log('开始集成测试...');
+            testDatabaseConnection();
+        };
+    </script>
+</body>
+</html>
