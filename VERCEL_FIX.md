@@ -107,6 +107,51 @@ Make sure these are set in Vercel:
 | `ADMIN_EMAIL` | admin@yourdomain.com (optional) |
 | `ADMIN_PASSWORD` | your-secure-password (optional) |
 
+## ID Generation Error Fix
+
+If you get "null value in column 'id' violates not-null constraint":
+
+### Option 1: Fix Table Defaults (Recommended)
+Run this in Supabase SQL Editor:
+```sql
+-- Enable UUID extensions
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+CREATE EXTENSION IF NOT EXISTS "pgcrypto";
+
+-- Add default values to all ID columns
+ALTER TABLE admins ALTER COLUMN id SET DEFAULT gen_random_uuid();
+ALTER TABLE agents ALTER COLUMN id SET DEFAULT gen_random_uuid();
+ALTER TABLE users ALTER COLUMN id SET DEFAULT gen_random_uuid();
+-- ... (run the full script from scripts/fix-table-defaults.sql)
+```
+
+### Option 2: Use Prisma to Recreate Tables
+```bash
+# In your local terminal
+export DATABASE_URL="your-supabase-connection-string"
+
+# This will recreate all tables with proper defaults
+npx prisma db push --force-reset
+
+# Then seed the database
+npm run db:seed
+```
+
+### Option 3: Manual ID in SQL
+If all else fails, manually provide IDs:
+```sql
+INSERT INTO admins (id, email, password, name, role, can_change_password, can_manage_admins)
+VALUES (
+    'a1b2c3d4e5f6',  -- Manual ID
+    'admin@example.com',
+    '$2a$10$K8ZpdrjrLKVvuE3p.b1yVuWYzAKr8qkTAVYJ4w8F5qD2mI7iQZnW2',
+    'System Admin',
+    'SUPER_ADMIN',
+    true,
+    true
+);
+```
+
 ## Still Having Issues?
 
 1. Check Supabase dashboard for connection pooler status
