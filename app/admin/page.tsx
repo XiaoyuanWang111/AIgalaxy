@@ -23,7 +23,7 @@ interface Agent {
   id: string
   name: string
   description: string
-  tags: string | string[]
+  tags: string[]
   manager: string
   homepage?: string
   icon?: string
@@ -76,6 +76,7 @@ export default function AdminDashboard() {
   const [applications, setApplications] = useState<Application[]>([])
   const [feedback, setFeedback] = useState<Feedback[]>([])
   const [feedbackButtons, setFeedbackButtons] = useState<FeedbackButton[]>([])
+  const [tutorialConfig, setTutorialConfig] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [modalVisible, setModalVisible] = useState(false)
   const [editingAgent, setEditingAgent] = useState<Agent | null>(null)
@@ -84,6 +85,8 @@ export default function AdminDashboard() {
   const [buttonModalVisible, setButtonModalVisible] = useState(false)
   const [editingButton, setEditingButton] = useState<FeedbackButton | null>(null)
   const [buttonForm] = Form.useForm()
+  const [tutorialModalVisible, setTutorialModalVisible] = useState(false)
+  const [tutorialForm] = Form.useForm()
   const [previewVisible, setPreviewVisible] = useState(false)
   const [previewContent, setPreviewContent] = useState('')
   const router = useRouter()
@@ -98,6 +101,7 @@ export default function AdminDashboard() {
     if (isAuthenticated) {
       fetchData()
       fetchFeedbackButtons()
+      fetchTutorialConfig()
     }
   }, [isAuthenticated])
 
@@ -125,6 +129,21 @@ export default function AdminDashboard() {
       setFeedbackButtons(data.buttons || [])
     } catch (error) {
       message.error('获取按钮配置失败')
+    }
+  }
+
+  const fetchTutorialConfig = async () => {
+    try {
+      const response = await fetch('/api/tutorial-config')
+      if (response.ok) {
+        const data = await response.json()
+        if (data.success) {
+          setTutorialConfig(data.data)
+          tutorialForm.setFieldsValue(data.data)
+        }
+      }
+    } catch (error) {
+      console.error('获取教程配置失败:', error)
     }
   }
 
@@ -285,6 +304,30 @@ export default function AdminDashboard() {
       fetchFeedbackButtons()
     } catch (error) {
       message.error('删除失败')
+    }
+  }
+
+  const handleTutorialSubmit = async (values: any) => {
+    try {
+      const response = await fetch('/api/tutorial-config', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(values),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || '更新失败')
+      }
+
+      message.success('教程配置更新成功')
+      setTutorialModalVisible(false)
+      fetchTutorialConfig()
+    } catch (error) {
+      console.error('Tutorial config update error:', error)
+      message.error(error instanceof Error ? error.message : '更新失败')
     }
   }
 
@@ -756,6 +799,62 @@ export default function AdminDashboard() {
                 pagination={{ pageSize: 10 }}
               />
             </TabPane>
+            <TabPane tab="奇绩教程配置" key="tutorial">
+              <Space style={{ marginBottom: 16 }}>
+                <Button
+                  type="primary"
+                  icon={<SettingOutlined />}
+                  onClick={() => {
+                    if (tutorialConfig) {
+                      tutorialForm.setFieldsValue({
+                        miracleTutorialUrl: tutorialConfig.miracle_tutorial_url,
+                        enabled: tutorialConfig.enabled,
+                        title: tutorialConfig.title,
+                        description: tutorialConfig.description
+                      })
+                    }
+                    setTutorialModalVisible(true)
+                  }}
+                >
+                  配置教程链接
+                </Button>
+              </Space>
+              
+              {tutorialConfig && (
+                <Card title="当前配置" style={{ marginTop: 16 }}>
+                  <Row gutter={16}>
+                    <Col span={12}>
+                      <div style={{ marginBottom: 16 }}>
+                        <Text strong>按钮标题：</Text>
+                        <div>{tutorialConfig.title || '奇绩教程'}</div>
+                      </div>
+                      <div style={{ marginBottom: 16 }}>
+                        <Text strong>教程链接：</Text>
+                        <div>
+                          <a href={tutorialConfig.miracle_tutorial_url} target="_blank" rel="noopener noreferrer">
+                            {tutorialConfig.miracle_tutorial_url}
+                          </a>
+                        </div>
+                      </div>
+                    </Col>
+                    <Col span={12}>
+                      <div style={{ marginBottom: 16 }}>
+                        <Text strong>启用状态：</Text>
+                        <div>
+                          <Tag color={tutorialConfig.enabled ? 'success' : 'default'}>
+                            {tutorialConfig.enabled ? '已启用' : '已禁用'}
+                          </Tag>
+                        </div>
+                      </div>
+                      <div style={{ marginBottom: 16 }}>
+                        <Text strong>描述：</Text>
+                        <div>{tutorialConfig.description || '无描述'}</div>
+                      </div>
+                    </Col>
+                  </Row>
+                </Card>
+              )}
+            </TabPane>
           </Tabs>
         </Card>
 
@@ -994,6 +1093,63 @@ export default function AdminDashboard() {
           </div>
         </Modal>
 
+
+        {/* Tutorial Config Modal */}
+        <Modal
+          title="奇绩教程配置"
+          open={tutorialModalVisible}
+          onCancel={() => {
+            setTutorialModalVisible(false)
+            tutorialForm.resetFields()
+          }}
+          onOk={() => tutorialForm.submit()}
+          okText="保存配置"
+          cancelText="取消"
+          width={600}
+        >
+          <Form
+            form={tutorialForm}
+            layout="vertical"
+            onFinish={handleTutorialSubmit}
+            className="admin-form-custom"
+          >
+            <Form.Item
+              label="按钮标题"
+              name="title"
+              rules={[{ required: true, message: '请输入按钮标题' }]}
+              initialValue="奇绩教程"
+            >
+              <Input placeholder="奇绩教程" />
+            </Form.Item>
+            <Form.Item
+              label="教程链接"
+              name="miracleTutorialUrl"
+              rules={[
+                { required: true, message: '请输入教程链接' },
+                { type: 'url', message: '请输入有效的URL' }
+              ]}
+            >
+              <Input placeholder="https://example.com/miracle-tutorial" />
+            </Form.Item>
+            <Form.Item
+              label="描述"
+              name="description"
+            >
+              <TextArea 
+                rows={3} 
+                placeholder="奇绩教程相关描述，会在使用指南页面显示"
+              />
+            </Form.Item>
+            <Form.Item
+              label="启用状态"
+              name="enabled"
+              valuePropName="checked"
+              initialValue={true}
+            >
+              <Switch checkedChildren="启用" unCheckedChildren="禁用" />
+            </Form.Item>
+          </Form>
+        </Modal>
 
         {/* Feedback Button Modal */}
         <Modal

@@ -87,7 +87,7 @@ model User {
   name      String?
   role      UserRole @default(USER)
   createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  updatedAt DateTime @updatedAt @default(now()) @map("updated_at")
 
   @@map("users")
 }
@@ -174,4 +174,16 @@ model DanmakuConfig {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   @@map("danmaku_config")
+}
+
+model TutorialConfig {
+  id                String   @id @default(cuid())
+  miracleTutorialUrl String  @map("miracle_tutorial_url") // 奇绩教程链接
+  enabled           Boolean  @default(true) // 是否启用
+  title             String   @default("奇绩教程") // 按钮标题
+  description       String?  // 描述
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  @@map("tutorial_config")
 }

@@ -2,8 +2,8 @@
 
 import { useState, useEffect } from 'react'
 import { useParams } from 'next/navigation'
-import { Card, Typography, Button, Space, Tag, Row, Col, Avatar, Statistic, Divider, Rate, Tabs, Empty, Spin, Descriptions } from 'antd'
-import { ArrowLeftOutlined, UserOutlined, CalendarOutlined, StarOutlined, MessageOutlined, BookOutlined, DownOutlined, UpOutlined } from '@ant-design/icons'
+import { Card, Typography, Button, Space, Tag, Row, Col, Avatar, Statistic, Divider, Rate, Tabs, Empty, Spin, Descriptions, message } from 'antd'
+import { ArrowLeftOutlined, UserOutlined, CalendarOutlined, StarOutlined, MessageOutlined, BookOutlined, DownOutlined, UpOutlined, FireOutlined } from '@ant-design/icons'
 import Link from 'next/link'
 import ReactMarkdown from 'react-markdown'
 import { FeedbackForm } from '@/components/FeedbackForm'
@@ -15,7 +15,7 @@ interface Agent {
   id: string
   name: string
   description: string
-  tags: string
+  tags: string[]
   manager: string
   guideUrl?: string
   homepage?: string
@@ -248,9 +248,11 @@ export default function AgentDetailPage() {
   const [agent, setAgent] = useState<Agent | null>(null)
   const [loading, setLoading] = useState(true)
   const [showFeedbackForm, setShowFeedbackForm] = useState(false)
+  const [tutorialConfig, setTutorialConfig] = useState<any>(null)
 
   useEffect(() => {
     fetchAgent()
+    fetchTutorialConfig()
   }, [params.id])
 
   const fetchAgent = async () => {
@@ -264,6 +266,20 @@ export default function AgentDetailPage() {
       console.error('Failed to load agent:', err)
     } finally {
       setLoading(false)
+    }
+  }
+
+  const fetchTutorialConfig = async () => {
+    try {
+      const response = await fetch('/api/tutorial-config')
+      if (response.ok) {
+        const data = await response.json()
+        if (data.success) {
+          setTutorialConfig(data.data)
+        }
+      }
+    } catch (err) {
+      console.error('Failed to load tutorial config:', err)
     }
   }
 
@@ -374,8 +390,8 @@ export default function AgentDetailPage() {
               </Space>
 
               <Space>
-                {agent.tags.split(',').map(tag => (
-                  <Tag key={tag.trim()} color="blue">{tag.trim()}</Tag>
+                {agent.tags.map(tag => (
+                  <Tag key={tag} color="blue">{tag}</Tag>
                 ))}
               </Space>
 
@@ -402,10 +418,49 @@ export default function AgentDetailPage() {
                 <span>使用指南</span>
               </Space>
             }
+            extra={
+              tutorialConfig && tutorialConfig.enabled && (
+                <Button
+                  type="primary"
+                  icon={<FireOutlined />}
+                  size="small"
+                  onClick={() => {
+                    window.open(tutorialConfig.miracle_tutorial_url, '_blank')
+                  }}
+                  style={{
+                    background: 'linear-gradient(135deg, #ff6b6b, #ee5a24)',
+                    border: 'none',
+                    boxShadow: '0 2px 8px rgba(238, 90, 36, 0.3)'
+                  }}
+                >
+                  {tutorialConfig.title || '奇绩教程'}
+                </Button>
+              )
+            }
           >
             <div className="prose max-w-none">
               <ReactMarkdown>{getAgentGuide(agent.name)}</ReactMarkdown>
             </div>
+            
+            {/* 奇绩教程说明卡片 */}
+            {tutorialConfig && tutorialConfig.enabled && tutorialConfig.description && (
+              <Card
+                size="small"
+                style={{
+                  marginTop: 16,
+                  background: 'linear-gradient(135deg, #fff5f5, #fee2e2)',
+                  border: '1px solid #fecaca',
+                  borderRadius: 8
+                }}
+              >
+                <Space>
+                  <FireOutlined style={{ color: '#ef4444' }} />
+                  <Text style={{ color: '#dc2626' }}>
+                    <strong>奇绩教程：</strong>{tutorialConfig.description}
+                  </Text>
+                </Space>
+              </Card>
+            )}
           </Card>
         </Col>
 

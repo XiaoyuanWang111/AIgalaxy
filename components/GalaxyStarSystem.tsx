@@ -7,7 +7,7 @@ interface Agent {
   id: string
   name: string
   description: string
-  tags: string
+  tags: string[]
   manager: string
   homepage?: string
   icon?: string
@@ -22,14 +22,14 @@ interface GalaxyStarSystemProps {
 }
 
 // 根据标签获取星星颜色 - 彩虹色系
-const getStarColor = (tags: string): string => {
-  const tagLower = tags.toLowerCase()
-  if (tagLower.includes('编程') || tagLower.includes('代码')) return '#FF0000' // 红色
-  if (tagLower.includes('设计') || tagLower.includes('图像')) return '#FF7F00' // 橙色
-  if (tagLower.includes('写作') || tagLower.includes('文档')) return '#FFFF00' // 黄色
-  if (tagLower.includes('搜索') || tagLower.includes('研究')) return '#00FF00' // 绿色
-  if (tagLower.includes('对话') || tagLower.includes('助手')) return '#0000FF' // 蓝色
-  if (tagLower.includes('分析') || tagLower.includes('数据')) return '#4B0082' // 靛色
+const getStarColor = (tags: string[]): string => {
+  const tagsLower = tags.join(' ').toLowerCase()
+  if (tagsLower.includes('编程') || tagsLower.includes('代码')) return '#FF0000' // 红色
+  if (tagsLower.includes('设计') || tagsLower.includes('图像')) return '#FF7F00' // 橙色
+  if (tagsLower.includes('写作') || tagsLower.includes('文档')) return '#FFFF00' // 黄色
+  if (tagsLower.includes('搜索') || tagsLower.includes('研究')) return '#00FF00' // 绿色
+  if (tagsLower.includes('对话') || tagsLower.includes('助手')) return '#0000FF' // 蓝色
+  if (tagsLower.includes('分析') || tagsLower.includes('数据')) return '#4B0082' // 靛色
   return '#9400D3' // 紫色（默认）
 }
 
@@ -628,7 +628,7 @@ const GalaxyStarSystem: React.FC<GalaxyStarSystemProps> = ({
                     flexWrap: 'wrap',
                     gap: '4px'
                   }}>
-                    {star.agent.tags.split(',').map((tag, index) => (
+                    {star.agent.tags.map((tag, index) => (
                       <span 
                         key={index}
                         style={{
@@ -813,7 +813,7 @@ const GalaxyStarSystem: React.FC<GalaxyStarSystemProps> = ({
             </div>
             
             <div style={{ fontSize: '10px', marginBottom: '12px', opacity: 0.7 }}>
-              🏷️ {selectedAgent.tags}
+              🏷️ {selectedAgent.tags.join(', ')}
             </div>
             
             <div style={{ display: 'flex', gap: '8px' }}>
