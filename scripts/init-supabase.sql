@@ -183,12 +183,25 @@ CREATE INDEX IF NOT EXISTS "agents_enabled_idx" ON "agents"("enabled");
 CREATE INDEX IF NOT EXISTS "agents_click_count_idx" ON "agents"("click_count");
 CREATE INDEX IF NOT EXISTS "star_magnitude_configs_isEnabled_idx" ON "star_magnitude_configs"("isEnabled");
 
--- 创建外键约束
-ALTER TABLE "agent_applications" ADD CONSTRAINT "agent_applications_agent_id_fkey" 
-    FOREIGN KEY ("agent_id") REFERENCES "agents"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-
-ALTER TABLE "agent_feedback" ADD CONSTRAINT "agent_feedback_agent_id_fkey" 
-    FOREIGN KEY ("agent_id") REFERENCES "agents"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+-- 创建外键约束（仅在不存在时创建）
+DO $$ 
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint 
+        WHERE conname = 'agent_applications_agent_id_fkey'
+    ) THEN
+        ALTER TABLE "agent_applications" ADD CONSTRAINT "agent_applications_agent_id_fkey" 
+            FOREIGN KEY ("agent_id") REFERENCES "agents"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+    END IF;
+    
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint 
+        WHERE conname = 'agent_feedback_agent_id_fkey'
+    ) THEN
+        ALTER TABLE "agent_feedback" ADD CONSTRAINT "agent_feedback_agent_id_fkey" 
+            FOREIGN KEY ("agent_id") REFERENCES "agents"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+    END IF;
+END$$;
 
 -- 插入默认数据
 -- 插入默认管理员 (password: admin123)
