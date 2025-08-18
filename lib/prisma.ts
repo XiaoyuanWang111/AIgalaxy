@@ -8,25 +8,35 @@ const globalForPrisma = globalThis as unknown as {
 function getDatabaseUrl(): string {
   // 优先使用 DATABASE_URL
   if (process.env.DATABASE_URL) {
-    console.log('Using DATABASE_URL')
-    return process.env.DATABASE_URL
+    // 清理可能的空白字符
+    const cleanUrl = process.env.DATABASE_URL.trim()
+    
+    // 检查是否有未编码的特殊字符
+    if (cleanUrl.includes('#') && !cleanUrl.includes('%23')) {
+      console.warn('WARNING: Unencoded # character found in DATABASE_URL')
+      console.warn('Replace # with %23 in your password')
+    }
+    
+    // 检查基本格式
+    if (!cleanUrl.startsWith('postgresql://') && !cleanUrl.startsWith('postgres://')) {
+      throw new Error('DATABASE_URL must start with postgresql:// or postgres://')
+    }
+    
+    console.log('Using DATABASE_URL (length: ' + cleanUrl.length + ')')
+    return cleanUrl
   }
   
   // Vercel Postgres 环境变量
   if (process.env.POSTGRES_PRISMA_URL) {
+    const cleanUrl = process.env.POSTGRES_PRISMA_URL.trim()
     console.log('Using POSTGRES_PRISMA_URL')
-    return process.env.POSTGRES_PRISMA_URL
+    return cleanUrl
   }
   
   if (process.env.POSTGRES_URL) {
+    const cleanUrl = process.env.POSTGRES_URL.trim()
     console.log('Using POSTGRES_URL')
-    return process.env.POSTGRES_URL
-  }
-  
-  // Supabase 环境变量
-  if (process.env.SUPABASE_URL && process.env.SUPABASE_ANON_KEY) {
-    // Supabase 数据库连接字符串需要手动构建
-    console.log('Supabase environment detected but DATABASE_URL not set')
+    return cleanUrl
   }
   
   throw new Error(
