@@ -26,6 +26,18 @@ In Vercel's deployment page, you'll see "Configure Project". Add these environme
 DATABASE_URL=postgresql://[user]:[password]@[host]:[port]/[database]?sslmode=require
 ```
 
+⚠️ **Important**: If your password contains special characters, they must be URL encoded:
+- `#` → `%23`
+- `@` → `%40`
+- `:` → `%3A`
+- `/` → `%2F`
+
+Example:
+```
+# Original password: xT#Uxs7uB-FfTjD
+# Encoded password: xT%23Uxs7uB-FfTjD
+```
+
 ### Optional Variables
 ```env
 # Session Secret (auto-generated if not provided)
