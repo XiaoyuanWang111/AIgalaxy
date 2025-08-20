@@ -151,3 +151,60 @@ ResearchFounderNetwork/
 # Duplicate project directories - causes build conflicts
 AEXD/
 ai-agent-platform/
+
+# === CLEANUP ADDITIONS ===
+# Prevent file structure chaos that was cleaned up
+
+# Temporary deployment files
+FORCE_DEPLOY_*.txt
+vercel-deploy-*.txt
+deploy-trigger.md
+
+# Debug and test files
+debug-*.html
+debug-*.js
+test-*.html
+test-integration.*
+
+# MacOS command files
+*.command
+countdown_timer.sh
+claude_interaction.sh
+启动*.command
+
+# Log files
+dev.log
+*.log
+
+# Unrelated projects (prevent accidental inclusion)
+CCUsageDashboard/
+co-founder*/
+stars/
+ResearchFounderNetwork/
+
+# Documentation files that should be in docs/
+*VERCEL*.md
+*MIGRATION*.md
+*MIGRATE*.md
+ccusage-commands-guide.md
+vercel-env-setup.md
+
+# Backup and cleanup files
+cleanup-*/
+project-cleanup-*/
+backup-*/
+*.backup
+*.bak
+
+# Build artifacts
+tsconfig.tsbuildinfo
+.tsbuildinfo
+
+# Public test files
+public/db-test.html
+public/admin-crud-test.html
+public/frontend-performance-test.html
+
+# Replit files
+.replit
+replit.nix
