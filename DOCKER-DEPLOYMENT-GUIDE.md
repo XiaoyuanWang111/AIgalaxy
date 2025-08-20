@@ -1,13 +1,13 @@
 # 🐳 AI Agent Platform Docker部署保姆级指南
 
-> 📌 **本指南将手把手教你完成从零开始的Docker部署，每一步都有详细说明和截图位置提示。**
+> 📌 **本指南将手把手教你完成从零开始的Docker部署，提供多种经济实惠的镜像仓库选择。**
 
 ## 📋 目录
 
 1. [准备工作](#准备工作)
 2. [本地Docker镜像构建](#本地docker镜像构建)
-3. [腾讯云容器镜像服务配置](#腾讯云容器镜像服务配置)
-4. [推送镜像到腾讯云](#推送镜像到腾讯云)
+3. [镜像仓库选择（3种方案）](#镜像仓库选择)
+4. [推送镜像](#推送镜像)
 5. [腾讯云服务器部署](#腾讯云服务器部署)
 6. [验证和测试](#验证和测试)
 7. [常见问题解决](#常见问题解决)
@@ -18,9 +18,12 @@
 
 ### 需要准备的账号和工具
 
-- [ ] **腾讯云账号** - [注册地址](https://cloud.tencent.com/)
-- [ ] **本地Docker** - 已安装Docker Desktop
 - [ ] **腾讯云服务器** - Ubuntu 20.04或更高版本
+- [ ] **本地Docker** - 已安装Docker Desktop
+- [ ] **镜像仓库账号**（选择一种即可）：
+  - [ ] **Docker Hub账号**（推荐，免费）
+  - [ ] **阿里云容器镜像服务**（免费）
+  - [ ] **腾讯云容器镜像服务**（付费，但速度快）
 - [ ] **域名**（可选）- 用于HTTPS访问
 
 ### 本地环境检查
@@ -122,103 +125,107 @@ docker images | grep ai-agent-platform
 
 ---
 
-## 🌐 腾讯云容器镜像服务配置
+## 📦 镜像仓库选择
 
-### 步骤1：登录腾讯云控制台
+选择一种适合你的镜像仓库方案：
 
-1. 打开浏览器访问：https://console.cloud.tencent.com/
-2. 使用你的腾讯云账号登录
-3. 在顶部搜索框输入"容器镜像服务"或"TCR"
-4. 点击进入"容器镜像服务"
+### 方案1：Docker Hub（推荐，免费）
 
-### 步骤2：开通容器镜像服务
+**优势**：
+- ✅ 完全免费
+- ✅ 全球CDN加速
+- ✅ 简单易用
+- ✅ 支持私有仓库（免费1个）
 
-如果是首次使用：
-1. 点击"立即开通"
-2. 选择"个人版"（免费）
-3. 点击"确定开通"
+**注册地址**：https://hub.docker.com/
 
-### 步骤3：创建命名空间
+**步骤**：
+1. 注册Docker Hub账号
+2. 登录并创建仓库（可选私有）
 
-1. 左侧菜单点击"命名空间"
-2. 点击"新建"按钮
-3. 填写信息：
-   - **命名空间名称**: `ai-platform`（或你喜欢的名称）
-   - **描述**: AI Agent Platform镜像
-4. 点击"确定"
+### 方案2：阿里云容器镜像服务（推荐，免费）
 
-### 步骤4：获取访问凭证
+**优势**：
+- ✅ 完全免费
+- ✅ 国内访问速度快
+- ✅ 个人版支持私有仓库
+- ✅ 中文界面友好
 
-1. 左侧菜单点击"访问凭证"
-2. 点击"新建"按钮
-3. 填写信息：
-   - **用户名**: 自动生成（记录下来）
-   - **密码**: 点击"生成密码"（记录下来）
-4. 点击"确定"
+**注册地址**：https://cr.console.aliyun.com/
 
-**⚠️ 重要：请将用户名和密码保存到安全的地方！**
+**步骤**：
+1. 注册阿里云账号
+2. 开通容器镜像服务（个人版免费）
+3. 创建命名空间
 
-### 步骤5：获取镜像仓库地址
+### 方案3：直接传输镜像文件（最省钱）
 
-1. 左侧菜单点击"我的镜像"
-2. 记录你的镜像仓库地址，格式如下：
-   ```
-   ccr.ccs.tencentyun.com/你的命名空间/镜像名称
-   ```
-   例如：`ccr.ccs.tencentyun.com/ai-platform/ai-agent-platform`
+**优势**：
+- ✅ 完全免费
+- ✅ 不依赖外部服务
+- ✅ 适合小团队
+
+**缺点**：
+- ❌ 需要手动传输文件
+- ❌ 更新时需要重新传输
 
 ---
 
-## 📤 推送镜像到腾讯云
+## 📤 推送镜像
 
-### 步骤1：登录腾讯云镜像仓库
-
-```bash
-# 1. 登录腾讯云镜像仓库
-docker login ccr.ccs.tencentyun.com
-
-# 2. 输入用户名（上一步记录的）
-Username: 100012345678
-
-# 3. 输入密码（上一步记录的）
-Password: ********
-
-# 看到 "Login Succeeded" 表示登录成功
-```
-
-### 步骤2：重新标记镜像
+### 方案1：推送到Docker Hub
 
 ```bash
-# 1. 标记镜像（替换命名空间为你创建的）
-docker tag ai-agent-platform:latest ccr.ccs.tencentyun.com/ai-platform/ai-agent-platform:latest
+# 1. 登录Docker Hub
+docker login
 
-# 2. 再打一个时间戳标签
-docker tag ai-agent-platform:latest ccr.ccs.tencentyun.com/ai-platform/ai-agent-platform:$(date +%Y%m%d-%H%M)
+# 输入你的Docker Hub用户名和密码
+Username: your-dockerhub-username
+Password: your-dockerhub-password
 
-# 3. 查看标记的镜像
-docker images | grep ccr.ccs.tencentyun.com
+# 2. 标记镜像（替换your-username为你的用户名）
+docker tag ai-agent-platform:latest your-username/ai-agent-platform:latest
+docker tag ai-agent-platform:latest your-username/ai-agent-platform:$(date +%Y%m%d-%H%M)
+
+# 3. 推送镜像
+docker push your-username/ai-agent-platform:latest
+docker push your-username/ai-agent-platform:$(date +%Y%m%d-%H%M)
+
+# 4. 验证推送成功
+# 访问: https://hub.docker.com/r/your-username/ai-agent-platform
 ```
 
-### 步骤3：推送镜像到腾讯云
+### 方案2：推送到阿里云
 
 ```bash
-# 1. 推送latest标签（这一步需要几分钟，取决于网速）
-docker push ccr.ccs.tencentyun.com/ai-platform/ai-agent-platform:latest
+# 1. 登录阿里云镜像仓库
+docker login --username=your-aliyun-username registry.cn-hangzhou.aliyuncs.com
 
-# 你会看到上传进度：
-# The push refers to repository [ccr.ccs.tencentyun.com/ai-platform/ai-agent-platform]
-# 5f70bf18a086: Pushing [==============>                ] 15.36MB/52.71MB
-# ... 更多层上传 ...
+# 2. 标记镜像
+docker tag ai-agent-platform:latest registry.cn-hangzhou.aliyuncs.com/your-namespace/ai-agent-platform:latest
 
-# 2. 推送时间戳标签
-docker push ccr.ccs.tencentyun.com/ai-platform/ai-agent-platform:$(date +%Y%m%d-%H%M)
+# 3. 推送镜像
+docker push registry.cn-hangzhou.aliyuncs.com/your-namespace/ai-agent-platform:latest
 ```
 
-### 步骤4：验证推送成功
+### 方案3：直接传输镜像文件
 
-1. 回到腾讯云控制台
-2. 点击"我的镜像"
-3. 你应该看到刚推送的镜像
+```bash
+# 1. 将镜像保存为文件
+docker save ai-agent-platform:latest -o ai-agent-platform.tar
+
+# 2. 压缩文件
+gzip ai-agent-platform.tar
+
+# 3. 上传到服务器
+scp ai-agent-platform.tar.gz root@your-server-ip:/tmp/
+
+# 4. 在服务器上加载镜像
+ssh root@your-server-ip
+cd /tmp
+gunzip ai-agent-platform.tar.gz
+docker load -i ai-agent-platform.tar
+```
 
 ---
 
@@ -252,15 +259,26 @@ sudo systemctl enable docker
 docker --version
 ```
 
-### 步骤3：登录腾讯云镜像仓库（服务器端）
+### 步骤3：配置Docker镜像加速（可选但推荐）
 
 ```bash
-# 1. 在服务器上登录镜像仓库
-docker login ccr.ccs.tencentyun.com
+# 创建Docker配置目录
+sudo mkdir -p /etc/docker
 
-# 2. 输入相同的用户名和密码
-Username: 100012345678
-Password: ********
+# 配置镜像加速器（使用阿里云加速器）
+sudo tee /etc/docker/daemon.json <<-'EOF'
+{
+  "registry-mirrors": [
+    "https://docker.mirrors.ustc.edu.cn",
+    "https://hub-mirror.c.163.com",
+    "https://mirror.baidubce.com"
+  ]
+}
+EOF
+
+# 重启Docker
+sudo systemctl daemon-reload
+sudo systemctl restart docker
 ```
 
 ### 步骤4：创建必要的目录
@@ -274,12 +292,20 @@ mkdir -p /opt/ai-agent-platform/uploads
 chmod -R 755 /opt/ai-agent-platform
 ```
 
-### 步骤5：创建PostgreSQL数据库
+### 步骤5：创建网络（推荐）
+
+```bash
+# 创建自定义Docker网络
+docker network create ai-network
+```
+
+### 步骤6：创建PostgreSQL数据库
 
 ```bash
 # 1. 运行PostgreSQL容器
 docker run -d \
   --name postgres \
+  --network ai-network \
   -e POSTGRES_DB=ai_galaxy \
   -e POSTGRES_USER=ai_galaxy_user \
   -e POSTGRES_PASSWORD=your_database_password \
@@ -292,12 +318,13 @@ docker run -d \
 docker ps | grep postgres
 ```
 
-### 步骤6：创建Redis缓存服务
+### 步骤7：创建Redis缓存服务
 
 ```bash
 # 1. 运行Redis容器
 docker run -d \
   --name redis \
+  --network ai-network \
   -p 6379:6379 \
   --restart unless-stopped \
   redis:7-alpine redis-server --requirepass your_redis_password
@@ -306,15 +333,20 @@ docker run -d \
 docker ps | grep redis
 ```
 
-### 步骤7：运行应用容器
+### 步骤8：运行应用容器
+
+**选择对应的镜像源**：
+
+#### 使用Docker Hub镜像
 
 ```bash
 # 1. 拉取镜像
-docker pull ccr.ccs.tencentyun.com/ai-platform/ai-agent-platform:latest
+docker pull your-username/ai-agent-platform:latest
 
-# 2. 运行应用（注意修改环境变量）
+# 2. 运行应用
 docker run -d \
   --name ai-agent-platform \
+  --network ai-network \
   -p 3000:3000 \
   --restart unless-stopped \
   -v /opt/ai-agent-platform/data:/app/data \
@@ -323,15 +355,49 @@ docker run -d \
   -e DATABASE_URL="postgresql://ai_galaxy_user:your_database_password@postgres:5432/ai_galaxy" \
   -e REDIS_URL="redis://:your_redis_password@redis:6379" \
   -e SESSION_SECRET="your-super-secret-session-key-minimum-32-characters" \
-  --link postgres:postgres \
-  --link redis:redis \
-  ccr.ccs.tencentyun.com/ai-platform/ai-agent-platform:latest
-
-# 3. 查看容器状态
-docker ps
+  your-username/ai-agent-platform:latest
 ```
 
-### 步骤8：初始化数据库
+#### 使用阿里云镜像
+
+```bash
+# 1. 拉取镜像
+docker pull registry.cn-hangzhou.aliyuncs.com/your-namespace/ai-agent-platform:latest
+
+# 2. 运行应用
+docker run -d \
+  --name ai-agent-platform \
+  --network ai-network \
+  -p 3000:3000 \
+  --restart unless-stopped \
+  -v /opt/ai-agent-platform/data:/app/data \
+  -v /opt/ai-agent-platform/uploads:/app/public/uploads \
+  -e NODE_ENV=production \
+  -e DATABASE_URL="postgresql://ai_galaxy_user:your_database_password@postgres:5432/ai_galaxy" \
+  -e REDIS_URL="redis://:your_redis_password@redis:6379" \
+  -e SESSION_SECRET="your-super-secret-session-key-minimum-32-characters" \
+  registry.cn-hangzhou.aliyuncs.com/your-namespace/ai-agent-platform:latest
+```
+
+#### 使用本地镜像文件
+
+```bash
+# 如果使用了方案3，镜像已经加载到本地，直接运行：
+docker run -d \
+  --name ai-agent-platform \
+  --network ai-network \
+  -p 3000:3000 \
+  --restart unless-stopped \
+  -v /opt/ai-agent-platform/data:/app/data \
+  -v /opt/ai-agent-platform/uploads:/app/public/uploads \
+  -e NODE_ENV=production \
+  -e DATABASE_URL="postgresql://ai_galaxy_user:your_database_password@postgres:5432/ai_galaxy" \
+  -e REDIS_URL="redis://:your_redis_password@redis:6379" \
+  -e SESSION_SECRET="your-super-secret-session-key-minimum-32-characters" \
+  ai-agent-platform:latest
+```
+
+### 步骤9：初始化数据库
 
 ```bash
 # 1. 等待容器启动（约30秒）
@@ -344,7 +410,7 @@ docker exec ai-agent-platform npx prisma db push
 docker exec ai-agent-platform npm run db:seed
 ```
 
-### 步骤9：配置Nginx反向代理（可选但推荐）
+### 步骤10：配置Nginx反向代理（可选但推荐）
 
 ```bash
 # 1. 安装Nginx
@@ -434,139 +500,104 @@ docker logs -f ai-agent-platform
 
 ---
 
-## 🔧 常见问题解决
+## 💰 成本对比
 
-### 问题1：Docker构建失败
+| 方案 | 月费用 | 优点 | 缺点 |
+|------|--------|------|------|
+| Docker Hub | 免费 | 全球CDN，稳定 | 国内访问可能较慢 |
+| 阿里云镜像服务 | 免费 | 国内访问快，中文界面 | 仅限国内 |
+| 文件传输 | 免费 | 完全免费，无限制 | 手动操作，更新麻烦 |
+| 腾讯云TCR | ¥1.2/GB/月 | 速度最快，功能强大 | 有费用 |
 
-**错误信息**：`failed to solve: process "/bin/sh -c npm ci" did not complete successfully`
+## 🔄 更新部署流程
 
-**解决方案**：
+### 使用Docker Hub/阿里云
+
 ```bash
-# 1. 清理Docker缓存
-docker system prune -a
+# 1. 本地重新构建镜像
+docker build -f deploy/docker/Dockerfile -t ai-agent-platform:latest .
 
-# 2. 重新构建（不使用缓存）
-docker build --no-cache -f deploy/docker/Dockerfile -t ai-agent-platform:latest .
+# 2. 推送新镜像
+docker push your-username/ai-agent-platform:latest
+
+# 3. 服务器更新
+ssh root@your-server-ip
+docker pull your-username/ai-agent-platform:latest
+docker stop ai-agent-platform
+docker rm ai-agent-platform
+# 重新运行容器（使用上面的命令）
 ```
 
-### 问题2：无法推送到腾讯云
+### 使用文件传输
+
+```bash
+# 1. 本地重新构建并保存
+docker build -f deploy/docker/Dockerfile -t ai-agent-platform:latest .
+docker save ai-agent-platform:latest | gzip > ai-agent-platform.tar.gz
+
+# 2. 上传到服务器
+scp ai-agent-platform.tar.gz root@your-server-ip:/tmp/
+
+# 3. 服务器更新
+ssh root@your-server-ip
+docker load -i /tmp/ai-agent-platform.tar.gz
+docker stop ai-agent-platform
+docker rm ai-agent-platform
+# 重新运行容器
+```
+
+---
+
+## 🚨 常见问题解决
+
+### 问题1：推送到Docker Hub失败
 
 **错误信息**：`denied: requested access to the resource is denied`
 
 **解决方案**：
 ```bash
 # 1. 重新登录
-docker logout ccr.ccs.tencentyun.com
-docker login ccr.ccs.tencentyun.com
+docker logout
+docker login
 
-# 2. 检查镜像标签是否正确
-docker images | grep ccr.ccs.tencentyun.com
+# 2. 检查镜像名称是否正确
+docker images | grep your-username
 ```
 
-### 问题3：容器无法启动
-
-**错误信息**：`docker: Error response from daemon: Conflict`
+### 问题2：国内访问Docker Hub慢
 
 **解决方案**：
 ```bash
-# 1. 停止并删除旧容器
-docker stop ai-agent-platform
-docker rm ai-agent-platform
-
-# 2. 重新运行容器
-docker run -d ... # 使用上面的完整命令
+# 使用镜像加速器
+sudo nano /etc/docker/daemon.json
+# 添加镜像加速器配置（如上文所示）
 ```
 
-### 问题4：数据库连接失败
-
-**错误信息**：`PrismaClientInitializationError: Can't reach database`
+### 问题3：服务器磁盘空间不足
 
 **解决方案**：
 ```bash
-# 1. 检查数据库容器状态
-docker ps | grep postgres
-
-# 2. 查看数据库日志
-docker logs postgres
-
-# 3. 测试数据库连接
-docker exec postgres psql -U ai_galaxy_user -d ai_galaxy -c "SELECT 1;"
-```
-
-### 问题5：网站无法访问
-
-**检查清单**：
-```bash
-# 1. 检查容器是否运行
-docker ps | grep ai-agent-platform
-
-# 2. 检查端口是否被占用
-sudo netstat -tlnp | grep 3000
-
-# 3. 检查防火墙
-sudo ufw status
-
-# 4. 开放端口（如果需要）
-sudo ufw allow 80/tcp
-sudo ufw allow 3000/tcp
-```
-
----
-
-## 📱 后续维护
-
-### 更新应用
-
-```bash
-# 1. 拉取最新镜像
-docker pull ccr.ccs.tencentyun.com/ai-platform/ai-agent-platform:latest
-
-# 2. 停止旧容器
-docker stop ai-agent-platform
-docker rm ai-agent-platform
-
-# 3. 运行新容器（使用相同的运行命令）
-docker run -d ... # 完整命令
-
-# 4. 清理旧镜像
-docker image prune -f
-```
-
-### 备份数据
-
-```bash
-# 1. 备份数据库
-docker exec postgres pg_dump -U ai_galaxy_user ai_galaxy > backup_$(date +%Y%m%d).sql
-
-# 2. 备份上传文件
-tar -czf uploads_backup_$(date +%Y%m%d).tar.gz /opt/ai-agent-platform/uploads
-```
-
-### 查看资源使用
-
-```bash
-# 查看容器资源使用
-docker stats
+# 清理无用的镜像和容器
+docker system prune -a
 
 # 查看磁盘使用
 df -h
-
-# 查看内存使用
-free -h
 ```
 
 ---
 
-## 🎉 恭喜！
+## 📝 总结
 
-如果你按照以上步骤操作，你的AI Agent Platform应该已经成功部署并运行了！
+**推荐方案排序**：
 
-**需要帮助？**
-- 查看应用日志：`docker logs ai-agent-platform`
-- 检查容器状态：`docker ps`
-- 查看详细文档：[部署文档](./deploy/README.md)
+1. **Docker Hub**（最简单，免费）
+2. **阿里云镜像服务**（国内用户推荐）
+3. **文件传输**（小项目或内网环境）
+4. **腾讯云TCR**（预算充足，追求极致性能）
+
+选择适合你的方案，按照对应的步骤操作即可！
 
 ---
 
 **最后更新**: 2025-08-20  
-**版本**: 保姆级指南 v1.0
+**版本**: 经济实用版 v2.0

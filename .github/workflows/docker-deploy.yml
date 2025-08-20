@@ -15,13 +15,19 @@ on:
           - staging
 
 env:
-  # 腾讯云镜像仓库配置
-  TCR_REGISTRY: ccr.ccs.tencentyun.com
-  TCR_NAMESPACE: ${{ secrets.TCR_NAMESPACE }}
+  # 镜像仓库配置
   IMAGE_NAME: ai-agent-platform
   
-  # Docker Hub配置（备选）
+  # Docker Hub配置（推荐，免费）
   DOCKER_HUB_USERNAME: ${{ secrets.DOCKER_HUB_USERNAME }}
+  
+  # 腾讯云镜像仓库配置（可选）
+  TCR_REGISTRY: ccr.ccs.tencentyun.com
+  TCR_NAMESPACE: ${{ secrets.TCR_NAMESPACE }}
+  
+  # 阿里云镜像仓库配置（可选）
+  ALIYUN_REGISTRY: registry.cn-hangzhou.aliyuncs.com
+  ALIYUN_NAMESPACE: ${{ secrets.ALIYUN_NAMESPACE }}
 
 jobs:
   build-and-push:
@@ -40,8 +46,9 @@ jobs:
       uses: docker/metadata-action@v5
       with:
         images: |
-          ${{ env.TCR_REGISTRY }}/${{ env.TCR_NAMESPACE }}/${{ env.IMAGE_NAME }}
           ${{ env.DOCKER_HUB_USERNAME }}/${{ env.IMAGE_NAME }}
+          ${{ env.TCR_REGISTRY }}/${{ env.TCR_NAMESPACE }}/${{ env.IMAGE_NAME }}
+          ${{ env.ALIYUN_REGISTRY }}/${{ env.ALIYUN_NAMESPACE }}/${{ env.IMAGE_NAME }}
         tags: |
           type=ref,event=branch
           type=ref,event=pr
@@ -57,20 +64,28 @@ jobs:
     - name: 🔧 Set up Docker Buildx
       uses: docker/setup-buildx-action@v3
       
-    - name: 🔐 Login to Tencent Cloud Registry
-      if: github.event_name != 'pull_request'
-      uses: docker/login-action@v3
-      with:
-        registry: ${{ env.TCR_REGISTRY }}
-        username: ${{ secrets.TCR_USERNAME }}
-        password: ${{ secrets.TCR_PASSWORD }}
-        
     - name: 🔐 Login to Docker Hub
       if: github.event_name != 'pull_request' && env.DOCKER_HUB_USERNAME != ''
       uses: docker/login-action@v3
       with:
         username: ${{ env.DOCKER_HUB_USERNAME }}
         password: ${{ secrets.DOCKER_HUB_TOKEN }}
+        
+    - name: 🔐 Login to Tencent Cloud Registry
+      if: github.event_name != 'pull_request' && secrets.TCR_USERNAME != ''
+      uses: docker/login-action@v3
+      with:
+        registry: ${{ env.TCR_REGISTRY }}
+        username: ${{ secrets.TCR_USERNAME }}
+        password: ${{ secrets.TCR_PASSWORD }}
+        
+    - name: 🔐 Login to Aliyun Registry
+      if: github.event_name != 'pull_request' && secrets.ALIYUN_USERNAME != ''
+      uses: docker/login-action@v3
+      with:
+        registry: ${{ env.ALIYUN_REGISTRY }}
+        username: ${{ secrets.ALIYUN_USERNAME }}
+        password: ${{ secrets.ALIYUN_PASSWORD }}
     
     - name: 📦 Build and Push Docker Image
       id: build
@@ -118,13 +133,25 @@ jobs:
           set -e
           echo "🚀 Starting Docker deployment..."
           
-          # 定义变量
-          IMAGE_TAG="${{ env.TCR_REGISTRY }}/${{ env.TCR_NAMESPACE }}/${{ env.IMAGE_NAME }}:latest"
+          # 定义变量 - 优先使用Docker Hub，其次阿里云，最后腾讯云
           CONTAINER_NAME="${{ env.IMAGE_NAME }}"
           
-          # 登录腾讯云镜像仓库
-          echo "🔐 Logging in to Tencent Cloud Registry..."
-          echo "${{ secrets.TCR_PASSWORD }}" | docker login -u "${{ secrets.TCR_USERNAME }}" --password-stdin ${{ env.TCR_REGISTRY }}
+          if [ "${{ env.DOCKER_HUB_USERNAME }}" != "" ]; then
+            IMAGE_TAG="${{ env.DOCKER_HUB_USERNAME }}/${{ env.IMAGE_NAME }}:latest"
+            echo "🔐 Logging in to Docker Hub..."
+            echo "${{ secrets.DOCKER_HUB_TOKEN }}" | docker login -u "${{ env.DOCKER_HUB_USERNAME }}" --password-stdin
+          elif [ "${{ secrets.ALIYUN_USERNAME }}" != "" ]; then
+            IMAGE_TAG="${{ env.ALIYUN_REGISTRY }}/${{ env.ALIYUN_NAMESPACE }}/${{ env.IMAGE_NAME }}:latest"
+            echo "🔐 Logging in to Aliyun Registry..."
+            echo "${{ secrets.ALIYUN_PASSWORD }}" | docker login -u "${{ secrets.ALIYUN_USERNAME }}" --password-stdin ${{ env.ALIYUN_REGISTRY }}
+          elif [ "${{ secrets.TCR_USERNAME }}" != "" ]; then
+            IMAGE_TAG="${{ env.TCR_REGISTRY }}/${{ env.TCR_NAMESPACE }}/${{ env.IMAGE_NAME }}:latest"
+            echo "🔐 Logging in to Tencent Cloud Registry..."
+            echo "${{ secrets.TCR_PASSWORD }}" | docker login -u "${{ secrets.TCR_USERNAME }}" --password-stdin ${{ env.TCR_REGISTRY }}
+          else
+            echo "❌ No registry credentials found! Please configure Docker Hub, Aliyun or Tencent Cloud credentials."
+            exit 1
+          fi
           
           # 拉取最新镜像
           echo "📥 Pulling latest image..."
