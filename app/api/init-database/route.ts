@@ -31,7 +31,7 @@ export async function GET(request: NextRequest) {
     console.log('Existing tables:', tables.map(t => t.table_name))
 
     // 初始化数据
-    let results = {
+    const results = {
       connection: 'success',
       tables: tables.map(t => t.table_name),
       initialization: {} as any

@@ -16,7 +16,7 @@ export async function GET(request: NextRequest) {
     const search = searchParams.get('search')
     const tag = searchParams.get('tag')
 
-    let where: any = { enabled: true }
+    const where: any = { enabled: true }
 
     // Check if we're using SQLite (file: URL)
     const isSQLite = process.env.DATABASE_URL?.startsWith('file:')

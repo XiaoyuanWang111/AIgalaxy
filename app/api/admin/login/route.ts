@@ -2,8 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import bcrypt from 'bcryptjs'
 import { generateAdminToken } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { ensureDatabase } from '@/lib/db-middleware'
-import { ensureDefaultAdmin } from '@/lib/init-admin'
+import { ensureDatabase, ensureDefaultAdmin } from '@/lib/db-middleware'
 
 export async function POST(request: NextRequest) {
   try {

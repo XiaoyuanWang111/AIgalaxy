@@ -12,7 +12,7 @@ export async function GET(request: NextRequest) {
     const search = searchParams.get('search')
     const tag = searchParams.get('tag')
 
-    let where: any = {} // 不过滤enabled状态，获取所有agents
+    const where: any = {} // 不过滤enabled状态，获取所有agents
 
     // 搜索过滤
     if (search) {

@@ -62,7 +62,7 @@ export async function GET(request: NextRequest) {
     const agentId = searchParams.get('agentId')
     const minScore = searchParams.get('minScore')
 
-    let where: any = {}
+    const where: any = {}
 
     if (agentId) {
       where.agentId = agentId

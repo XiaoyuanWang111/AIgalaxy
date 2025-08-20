@@ -68,7 +68,7 @@ export async function GET(request: NextRequest) {
     const status = searchParams.get('status')
     const agentId = searchParams.get('agentId')
 
-    let where: any = {}
+    const where: any = {}
 
     if (status && status !== 'all') {
       where.status = status

@@ -23,6 +23,32 @@ export async function ensureDatabase(): Promise<void> {
   }
 }
 
+// 单独的函数用于确保默认管理员存在
+export async function ensureDefaultAdmin(): Promise<void> {
+  try {
+    const adminCount = await prisma.admin.count()
+    if (adminCount === 0) {
+      console.log('Creating default admin...')
+      const bcrypt = await import('bcryptjs')
+      const hashedPassword = await bcrypt.hash('admin123', 10)
+      
+      await prisma.admin.create({
+        data: {
+          email: 'admin@example.com',
+          password: hashedPassword,
+          name: 'System Admin',
+          role: 'SUPER_ADMIN',
+          canChangePassword: true,
+          canManageAdmins: true
+        }
+      })
+      console.log('Default admin created')
+    }
+  } catch (error) {
+    console.error('Failed to ensure default admin:', error)
+  }
+}
+
 async function seedInitialData(): Promise<void> {
   try {
     // 创建默认管理员

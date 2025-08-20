@@ -30,7 +30,7 @@ export async function GET() {
     }
     
     // 尝试手动解析 URL
-    let parseResult = { success: false, error: '', components: {} as any }
+    const parseResult = { success: false, error: '', components: {} as any }
     try {
       // 使用更宽松的正则表达式
       const regex = /^(postgresql|postgres):\/\/([^\/]+)\/(.+)$/
@@ -66,7 +66,7 @@ export async function GET() {
     }
     
     // 尝试使用 URL 构造函数
-    let urlConstructorResult = { success: false, error: '', parsed: {} as any }
+    const urlConstructorResult = { success: false, error: '', parsed: {} as any }
     try {
       // 替换 postgresql:// 为 https:// 以使用 URL 构造函数
       const testUrl = dbUrl.replace(/^postgresql:\/\//, 'https://')
@@ -85,7 +85,7 @@ export async function GET() {
     }
     
     // 检查 Prisma 能否解析
-    let prismaCheck = { success: false, error: '', version: '' }
+    const prismaCheck = { success: false, error: '', version: '' }
     try {
       const { PrismaClient } = await import('@prisma/client')
       prismaCheck.version = require('@prisma/client/package.json').version
