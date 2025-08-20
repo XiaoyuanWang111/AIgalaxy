@@ -1,0 +1,225 @@
+name: 🐳 Docker Build and Deploy
+
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy'
+        required: true
+        default: 'production'
+        type: choice
+        options:
+          - production
+          - staging
+
+env:
+  # 腾讯云镜像仓库配置
+  TCR_REGISTRY: ccr.ccs.tencentyun.com
+  TCR_NAMESPACE: ${{ secrets.TCR_NAMESPACE }}
+  IMAGE_NAME: ai-agent-platform
+  
+  # Docker Hub配置（备选）
+  DOCKER_HUB_USERNAME: ${{ secrets.DOCKER_HUB_USERNAME }}
+
+jobs:
+  build-and-push:
+    name: 🔨 Build and Push Docker Image
+    runs-on: ubuntu-latest
+    outputs:
+      image-tag: ${{ steps.meta.outputs.tags }}
+      image-digest: ${{ steps.build.outputs.digest }}
+    
+    steps:
+    - name: 📂 Checkout Repository
+      uses: actions/checkout@v4
+      
+    - name: 🏷️ Generate Docker Metadata
+      id: meta
+      uses: docker/metadata-action@v5
+      with:
+        images: |
+          ${{ env.TCR_REGISTRY }}/${{ env.TCR_NAMESPACE }}/${{ env.IMAGE_NAME }}
+          ${{ env.DOCKER_HUB_USERNAME }}/${{ env.IMAGE_NAME }}
+        tags: |
+          type=ref,event=branch
+          type=ref,event=pr
+          type=semver,pattern={{version}}
+          type=semver,pattern={{major}}.{{minor}}
+          type=sha,prefix={{branch}}-
+          type=raw,value=latest,enable={{is_default_branch}}
+          type=raw,value={{date 'YYYYMMDD-HHmm'}}
+    
+    - name: 🔧 Set up QEMU
+      uses: docker/setup-qemu-action@v3
+      
+    - name: 🔧 Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+      
+    - name: 🔐 Login to Tencent Cloud Registry
+      if: github.event_name != 'pull_request'
+      uses: docker/login-action@v3
+      with:
+        registry: ${{ env.TCR_REGISTRY }}
+        username: ${{ secrets.TCR_USERNAME }}
+        password: ${{ secrets.TCR_PASSWORD }}
+        
+    - name: 🔐 Login to Docker Hub
+      if: github.event_name != 'pull_request' && env.DOCKER_HUB_USERNAME != ''
+      uses: docker/login-action@v3
+      with:
+        username: ${{ env.DOCKER_HUB_USERNAME }}
+        password: ${{ secrets.DOCKER_HUB_TOKEN }}
+    
+    - name: 📦 Build and Push Docker Image
+      id: build
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        file: ./deploy/docker/Dockerfile
+        platforms: linux/amd64,linux/arm64
+        push: ${{ github.event_name != 'pull_request' }}
+        tags: ${{ steps.meta.outputs.tags }}
+        labels: ${{ steps.meta.outputs.labels }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+        build-args: |
+          BUILD_DATE=${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.created'] }}
+          VCS_REF=${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.revision'] }}
+          VERSION=${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.version'] }}
+    
+    - name: 📊 Image Summary
+      run: |
+        echo "### Docker Image Build Summary 🐳" >> $GITHUB_STEP_SUMMARY
+        echo "- **Image Tags:** ${{ steps.meta.outputs.tags }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Image Digest:** ${{ steps.build.outputs.digest }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Build Date:** $(date)" >> $GITHUB_STEP_SUMMARY
+
+  deploy-to-server:
+    name: 🚀 Deploy to Production Server
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    environment: production
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    
+    steps:
+    - name: 📂 Checkout Repository
+      uses: actions/checkout@v4
+      
+    - name: 🚀 Deploy to Tencent Cloud Server
+      uses: appleboy/ssh-action@v1.0.3
+      with:
+        host: ${{ secrets.HOST }}
+        username: ${{ secrets.USERNAME }}
+        key: ${{ secrets.SSH_KEY }}
+        port: ${{ secrets.PORT }}
+        script: |
+          set -e
+          echo "🚀 Starting Docker deployment..."
+          
+          # 定义变量
+          IMAGE_TAG="${{ env.TCR_REGISTRY }}/${{ env.TCR_NAMESPACE }}/${{ env.IMAGE_NAME }}:latest"
+          CONTAINER_NAME="${{ env.IMAGE_NAME }}"
+          
+          # 登录腾讯云镜像仓库
+          echo "🔐 Logging in to Tencent Cloud Registry..."
+          echo "${{ secrets.TCR_PASSWORD }}" | docker login -u "${{ secrets.TCR_USERNAME }}" --password-stdin ${{ env.TCR_REGISTRY }}
+          
+          # 拉取最新镜像
+          echo "📥 Pulling latest image..."
+          docker pull $IMAGE_TAG
+          
+          # 停止并删除旧容器（如果存在）
+          echo "🛑 Stopping old container..."
+          docker stop $CONTAINER_NAME || true
+          docker rm $CONTAINER_NAME || true
+          
+          # 创建数据目录（如果不存在）
+          mkdir -p /opt/${{ env.IMAGE_NAME }}/data
+          mkdir -p /opt/${{ env.IMAGE_NAME }}/uploads
+          
+          # 运行新容器
+          echo "🚀 Starting new container..."
+          docker run -d \
+            --name $CONTAINER_NAME \
+            -p 3000:3000 \
+            --restart unless-stopped \
+            -v /opt/${{ env.IMAGE_NAME }}/data:/app/data \
+            -v /opt/${{ env.IMAGE_NAME }}/uploads:/app/public/uploads \
+            -e NODE_ENV=production \
+            -e DATABASE_URL="${{ secrets.DATABASE_URL }}" \
+            -e REDIS_URL="${{ secrets.REDIS_URL }}" \
+            -e SESSION_SECRET="${{ secrets.SESSION_SECRET }}" \
+            --health-cmd="curl -f http://localhost:3000/api/health || exit 1" \
+            --health-interval=30s \
+            --health-timeout=10s \
+            --health-retries=3 \
+            --health-start-period=60s \
+            $IMAGE_TAG
+          
+          # 等待容器启动
+          echo "⏳ Waiting for container to be healthy..."
+          sleep 10
+          
+          # 检查容器状态
+          docker ps | grep $CONTAINER_NAME
+          
+          # 运行数据库迁移（如果需要）
+          echo "🗄️ Running database migrations..."
+          docker exec $CONTAINER_NAME npx prisma db push || true
+          
+          # 清理旧镜像
+          echo "🧹 Cleaning up old images..."
+          docker image prune -f
+          
+          # 健康检查
+          echo "🏥 Performing health check..."
+          sleep 5
+          curl -f http://localhost:3000/api/health || exit 1
+          
+          echo "✅ Deployment completed successfully!"
+          
+    - name: 🔍 Verify Deployment
+      uses: appleboy/ssh-action@v1.0.3
+      with:
+        host: ${{ secrets.HOST }}
+        username: ${{ secrets.USERNAME }}
+        key: ${{ secrets.SSH_KEY }}
+        port: ${{ secrets.PORT }}
+        script: |
+          # 检查容器状态
+          docker ps | grep ${{ env.IMAGE_NAME }}
+          
+          # 检查应用日志
+          docker logs --tail 50 ${{ env.IMAGE_NAME }}
+          
+          # 检查健康状态
+          docker inspect ${{ env.IMAGE_NAME }} --format='{{.State.Health.Status}}'
+
+  notify:
+    name: 📬 Notify Deployment Status
+    needs: [build-and-push, deploy-to-server]
+    runs-on: ubuntu-latest
+    if: always()
+    
+    steps:
+    - name: 📊 Deployment Summary
+      run: |
+        echo "### Deployment Summary 🚀" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        
+        if [[ "${{ needs.deploy-to-server.result }}" == "success" ]]; then
+          echo "✅ **Deployment Status:** Success" >> $GITHUB_STEP_SUMMARY
+          echo "🌐 **Application URL:** https://${{ secrets.DOMAIN }}" >> $GITHUB_STEP_SUMMARY
+          echo "🐳 **Image:** ${{ needs.build-and-push.outputs.image-tag }}" >> $GITHUB_STEP_SUMMARY
+          echo "🔧 **Digest:** ${{ needs.build-and-push.outputs.image-digest }}" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "❌ **Deployment Status:** Failed" >> $GITHUB_STEP_SUMMARY
+          echo "Please check the logs for more details." >> $GITHUB_STEP_SUMMARY
+        fi
+        
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "📅 **Deployed at:** $(date)" >> $GITHUB_STEP_SUMMARY
+        echo "👤 **Triggered by:** ${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
+        echo "🔗 **Commit:** ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
