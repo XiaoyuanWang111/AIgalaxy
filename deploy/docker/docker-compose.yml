@@ -1,0 +1,152 @@
+# AI Galaxy Platform - Complete Stack Deployment
+# Frontend + Backend + Database + Reverse Proxy
+
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: ai-galaxy-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ai_galaxy
+      POSTGRES_USER: ai_galaxy_user
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-ai_galaxy_password_2024}
+      POSTGRES_INITDB_ARGS: "--encoding=UTF-8 --lc-collate=C --lc-ctype=C"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init-db.sql:/docker-entrypoint-initdb.d/init-db.sql:ro
+    ports:
+      - "5432:5432"
+    networks:
+      - ai-galaxy-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ai_galaxy_user -d ai_galaxy"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  # Redis (for caching and sessions)
+  redis:
+    image: redis:7-alpine
+    container_name: ai-galaxy-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-redis_password_2024}
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    networks:
+      - ai-galaxy-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  # AI Galaxy Application
+  app:
+    build:
+      context: ../..
+      dockerfile: deploy/docker/Dockerfile
+    container_name: ai-galaxy-app
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://ai_galaxy_user:${DB_PASSWORD:-ai_galaxy_password_2024}@postgres:5432/ai_galaxy
+      REDIS_URL: redis://:${REDIS_PASSWORD:-redis_password_2024}@redis:6379
+      SESSION_SECRET: ${SESSION_SECRET:-your-super-secret-session-key-change-in-production}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@ai-galaxy.com}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-admin123}
+      NEXT_PUBLIC_APP_NAME: "AI Galaxy"
+      NEXT_PUBLIC_APP_VERSION: "2.1.5"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    ports:
+      - "3000:3000"
+    networks:
+      - ai-galaxy-network
+    volumes:
+      - app_uploads:/app/public/uploads
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+  # Nginx Reverse Proxy
+  nginx:
+    image: nginx:alpine
+    container_name: ai-galaxy-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ../nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ../nginx/sites-available:/etc/nginx/sites-available:ro
+      - ../nginx/ssl:/etc/nginx/ssl:ro
+      - nginx_logs:/var/log/nginx
+    depends_on:
+      app:
+        condition: service_healthy
+    networks:
+      - ai-galaxy-network
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  # Database Management Tool (optional)
+  adminer:
+    image: adminer:latest
+    container_name: ai-galaxy-adminer
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      ADMINER_DEFAULT_SERVER: postgres
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - ai-galaxy-network
+    profiles:
+      - tools
+
+  # Monitoring (optional)
+  portainer:
+    image: portainer/portainer-ce:latest
+    container_name: ai-galaxy-portainer
+    restart: unless-stopped
+    ports:
+      - "9000:9000"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - portainer_data:/data
+    networks:
+      - ai-galaxy-network
+    profiles:
+      - tools
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  app_uploads:
+    driver: local
+  nginx_logs:
+    driver: local
+  portainer_data:
+    driver: local
+
+networks:
+  ai-galaxy-network:
+    driver: bridge

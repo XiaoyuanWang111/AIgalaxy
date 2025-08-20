@@ -20,7 +20,7 @@ const nextConfig = {
     optimizePackageImports: ['antd', '@ant-design/icons'],
   },
   swcMinify: true,
-  output: process.env.BUILD_OUTPUT === 'export' ? 'export' : undefined,
+  output: process.env.BUILD_OUTPUT === 'export' ? 'export' : (process.env.NODE_ENV === 'production' ? 'standalone' : undefined),
   trailingSlash: false,
   poweredByHeader: false,
   generateEtags: false,
