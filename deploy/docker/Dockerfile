@@ -5,8 +5,8 @@
 FROM node:18-alpine AS deps
 WORKDIR /app
 
-# Install curl for health checks
-RUN apk add --no-cache curl
+# Install curl and OpenSSL for health checks and Prisma
+RUN apk add --no-cache curl openssl
 
 # Copy package files
 COPY package*.json ./
@@ -37,8 +37,8 @@ RUN npm run build
 FROM node:18-alpine AS runner
 WORKDIR /app
 
-# Install curl for health checks
-RUN apk add --no-cache curl
+# Install curl and OpenSSL for health checks and Prisma
+RUN apk add --no-cache curl openssl
 
 # Create non-root user
 RUN addgroup --system --gid 1001 nodejs
@@ -57,8 +57,8 @@ COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
 # Copy package.json for npm scripts
 COPY --from=builder /app/package.json ./package.json
 
-# Copy deployment scripts
-COPY --from=builder /app/deploy/scripts ./deploy/scripts
+# Copy deployment scripts (optional)
+# COPY --from=builder /app/deploy/scripts ./deploy/scripts
 
 # Set environment variables
 ENV NODE_ENV=production
