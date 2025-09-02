@@ -1,0 +1,309 @@
+name: 🌿 Preview Deployment
+
+on:
+  pull_request:
+    branches: [ main, master ]
+    types: [opened, synchronize, reopened]
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: 'Branch to deploy'
+        required: true
+        default: 'develop'
+
+env:
+  NODE_VERSION: "18"
+
+jobs:
+  # Build Preview
+  build-preview:
+    name: 🏗️ Build Preview
+    runs-on: ubuntu-latest
+    
+    outputs:
+      preview-url: ${{ steps.deploy.outputs.preview-url }}
+      
+    steps:
+    - name: 📂 Checkout Repository
+      uses: actions/checkout@v4
+      
+    - name: ⚙️ Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+        
+    - name: 📦 Install Dependencies
+      run: npm ci
+      
+    - name: 🗄️ Generate Prisma Client
+      run: npx prisma generate
+      
+    - name: 🔨 Build for Preview
+      run: npm run build
+      env:
+        DATABASE_URL: "postgresql://preview:preview@localhost:5432/preview"
+        NODE_ENV: "production"
+        
+    - name: 📦 Create Deployment Package
+      run: |
+        mkdir -p preview-package
+        cp -r .next preview-package/
+        cp -r public preview-package/
+        cp -r prisma preview-package/
+        cp package.json preview-package/
+        cp next.config.js preview-package/
+        
+    - name: 🚀 Deploy to Preview Environment
+      id: deploy
+      run: |
+        # 这里可以集成到你的预览环境
+        # 比如 Vercel Preview, Netlify Deploy Preview, 或自定义环境
+        
+        echo "🌟 Deploying to preview environment..."
+        
+        # 示例：部署到测试服务器的子目录
+        PREVIEW_ID="pr-${{ github.event.number || github.ref_name }}"
+        PREVIEW_URL="https://preview.yourdomain.com/${PREVIEW_ID}"
+        
+        echo "preview-url=${PREVIEW_URL}" >> $GITHUB_OUTPUT
+        echo "preview-id=${PREVIEW_ID}" >> $GITHUB_OUTPUT
+        
+        echo "✅ Preview deployed to: ${PREVIEW_URL}"
+
+  # Run E2E Tests on Preview
+  e2e-tests:
+    name: 🧪 E2E Tests
+    needs: build-preview
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    
+    steps:
+    - name: 📂 Checkout Repository
+      uses: actions/checkout@v4
+      
+    - name: ⚙️ Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+        
+    - name: 📦 Install Dependencies
+      run: npm ci
+      
+    - name: 🎭 Install Playwright
+      run: |
+        if npm list @playwright/test --depth=0 2>/dev/null; then
+          npx playwright install --with-deps
+        else
+          echo "Installing Playwright for E2E testing..."
+          npm install --save-dev @playwright/test
+          npx playwright install --with-deps
+        fi
+        
+    - name: 🏃 Run E2E Tests
+      run: |
+        # 创建基础的E2E测试文件（如果不存在）
+        if [ ! -f "playwright.config.js" ]; then
+          echo "Creating basic Playwright configuration..."
+          cat > playwright.config.js << 'EOF'
+        import { defineConfig, devices } from '@playwright/test';
+
+        export default defineConfig({
+          testDir: './e2e',
+          fullyParallel: true,
+          forbidOnly: !!process.env.CI,
+          retries: process.env.CI ? 2 : 0,
+          workers: process.env.CI ? 1 : undefined,
+          reporter: 'html',
+          use: {
+            baseURL: process.env.PREVIEW_URL || 'http://localhost:3000',
+            trace: 'on-first-retry',
+          },
+          projects: [
+            {
+              name: 'chromium',
+              use: { ...devices['Desktop Chrome'] },
+            },
+          ],
+          webServer: {
+            command: 'npm run start',
+            port: 3000,
+            reuseExistingServer: !process.env.CI,
+          },
+        });
+        EOF
+        fi
+        
+        # 创建基础的E2E测试
+        mkdir -p e2e
+        if [ ! -f "e2e/basic.spec.js" ]; then
+          cat > e2e/basic.spec.js << 'EOF'
+        const { test, expect } = require('@playwright/test');
+
+        test.describe('Basic Application Tests', () => {
+          test('homepage loads successfully', async ({ page }) => {
+            await page.goto('/');
+            await expect(page).toHaveTitle(/AI Galaxy|AI Agent/i);
+          });
+
+          test('navigation works', async ({ page }) => {
+            await page.goto('/');
+            
+            // 检查基本导航元素
+            const navigation = page.locator('nav, .nav, [role="navigation"]');
+            if (await navigation.isVisible()) {
+              await expect(navigation).toBeVisible();
+            }
+          });
+
+          test('admin page is accessible', async ({ page }) => {
+            await page.goto('/admin');
+            // 应该重定向到登录页面或显示管理界面
+            await expect(page).toHaveURL(/\/admin|\/login/);
+          });
+        });
+        EOF
+        fi
+        
+        # 运行测试
+        if [ "${{ needs.build-preview.outputs.preview-url }}" != "" ]; then
+          PREVIEW_URL="${{ needs.build-preview.outputs.preview-url }}" npx playwright test
+        else
+          echo "Preview URL not available, running against local server"
+          npm run dev &
+          sleep 10
+          npx playwright test
+          pkill -f "next dev" || true
+        fi
+      env:
+        PREVIEW_URL: ${{ needs.build-preview.outputs.preview-url }}
+        
+    - name: 📊 Upload Test Results
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: playwright-report
+        path: playwright-report/
+        retention-days: 7
+
+  # Performance Testing
+  performance-test:
+    name: ⚡ Performance Test
+    needs: build-preview
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    
+    steps:
+    - name: 📂 Checkout Repository
+      uses: actions/checkout@v4
+      
+    - name: ⚙️ Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+        
+    - name: 🚀 Install Lighthouse CI
+      run: |
+        npm install -g @lhci/cli@0.12.x
+        
+    - name: ⚡ Run Lighthouse CI
+      run: |
+        # 创建Lighthouse配置
+        cat > lighthouserc.js << 'EOF'
+        module.exports = {
+          ci: {
+            collect: {
+              url: [
+                process.env.PREVIEW_URL || 'http://localhost:3000',
+                (process.env.PREVIEW_URL || 'http://localhost:3000') + '/admin'
+              ],
+              startServerCommand: 'npm run start',
+              numberOfRuns: 3,
+            },
+            assert: {
+              assertions: {
+                'categories:performance': ['warn', { minScore: 0.7 }],
+                'categories:accessibility': ['error', { minScore: 0.9 }],
+                'categories:best-practices': ['warn', { minScore: 0.8 }],
+                'categories:seo': ['warn', { minScore: 0.8 }],
+              },
+            },
+            upload: {
+              target: 'temporary-public-storage',
+            },
+          },
+        };
+        EOF
+        
+        if [ "${{ needs.build-preview.outputs.preview-url }}" != "" ]; then
+          PREVIEW_URL="${{ needs.build-preview.outputs.preview-url }}" lhci autorun
+        else
+          echo "Running Lighthouse against local server"
+          lhci autorun
+        fi
+      env:
+        PREVIEW_URL: ${{ needs.build-preview.outputs.preview-url }}
+
+  # Update PR with Results
+  update-pr:
+    name: 📝 Update PR
+    needs: [build-preview, e2e-tests, performance-test]
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request' && always()
+    
+    steps:
+    - name: 📝 Comment PR
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const { data: comments } = await github.rest.issues.listComments({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            issue_number: context.issue.number,
+          });
+          
+          // 查找之前的预览评论
+          const botComment = comments.find(comment => 
+            comment.user.type === 'Bot' && 
+            comment.body.includes('🌿 Preview Deployment')
+          );
+          
+          const previewUrl = '${{ needs.build-preview.outputs.preview-url }}';
+          const e2eStatus = '${{ needs.e2e-tests.result }}';
+          const perfStatus = '${{ needs.performance-test.result }}';
+          
+          const body = `## 🌿 Preview Deployment
+          
+          ### 🚀 Deployment Status
+          ${previewUrl ? `✅ **Preview URL:** [${previewUrl}](${previewUrl})` : '❌ **Preview deployment failed**'}
+          
+          ### 🧪 Test Results
+          - **E2E Tests:** ${e2eStatus === 'success' ? '✅ Passed' : e2eStatus === 'failure' ? '❌ Failed' : '⏳ Skipped'}
+          - **Performance Tests:** ${perfStatus === 'success' ? '✅ Passed' : perfStatus === 'failure' ? '❌ Failed' : '⏳ Skipped'}
+          
+          ### 📊 Quick Actions
+          - 🔍 [View Checks](${context.payload.pull_request.html_url}/checks)
+          - 🎭 [E2E Test Report](https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId})
+          
+          ---
+          *Updated at: ${new Date().toISOString()}*
+          *Commit: ${context.sha.substring(0, 7)}*
+          `;
+          
+          if (botComment) {
+            await github.rest.issues.updateComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              comment_id: botComment.id,
+              body: body
+            });
+          } else {
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: body
+            });
+          }

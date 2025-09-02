@@ -1,0 +1,305 @@
+name: 🚀 Release Automation
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version (e.g., 1.0.0)'
+        required: true
+        type: string
+      release_type:
+        description: 'Release type'
+        required: true
+        default: 'release'
+        type: choice
+        options:
+          - release
+          - prerelease
+          - draft
+
+env:
+  NODE_VERSION: "18"
+
+jobs:
+  # Prepare Release
+  prepare-release:
+    name: 📋 Prepare Release
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      tag: ${{ steps.version.outputs.tag }}
+      changelog: ${{ steps.changelog.outputs.changelog }}
+      
+    steps:
+    - name: 📂 Checkout Repository
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0  # Needed for changelog generation
+        
+    - name: 🏷️ Determine Version
+      id: version
+      run: |
+        if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+          VERSION="${{ github.event.inputs.version }}"
+          TAG="v${VERSION}"
+        else
+          TAG="${{ github.ref_name }}"
+          VERSION="${TAG#v}"
+        fi
+        
+        echo "version=${VERSION}" >> $GITHUB_OUTPUT
+        echo "tag=${TAG}" >> $GITHUB_OUTPUT
+        echo "Version: ${VERSION}"
+        echo "Tag: ${TAG}"
+        
+    - name: 📝 Generate Changelog
+      id: changelog
+      run: |
+        echo "Generating changelog for ${VERSION}..."
+        
+        # 获取上一个标签
+        PREV_TAG=$(git tag --sort=-version:refname | head -2 | tail -1)
+        if [ -z "$PREV_TAG" ]; then
+          PREV_TAG=$(git rev-list --max-parents=0 HEAD)
+        fi
+        
+        echo "Previous tag: $PREV_TAG"
+        echo "Current tag: ${{ steps.version.outputs.tag }}"
+        
+        # 生成更改日志
+        CHANGELOG=$(cat << 'EOF'
+        ## 🚀 What's New in ${{ steps.version.outputs.version }}
+        
+        ### ✨ Features
+        EOF
+        )
+        
+        # 获取功能提交
+        git log ${PREV_TAG}..${{ github.sha }} --pretty=format:"- %s" --grep="feat:" --grep="feature:" | head -10 | while read line; do
+          if [ ! -z "$line" ]; then
+            CHANGELOG="${CHANGELOG}\n${line}"
+          fi
+        done
+        
+        CHANGELOG="${CHANGELOG}\n\n### 🐛 Bug Fixes"
+        
+        # 获取bug修复提交
+        git log ${PREV_TAG}..${{ github.sha }} --pretty=format:"- %s" --grep="fix:" --grep="bug:" | head -10 | while read line; do
+          if [ ! -z "$line" ]; then
+            CHANGELOG="${CHANGELOG}\n${line}"
+          fi
+        done
+        
+        CHANGELOG="${CHANGELOG}\n\n### 🛠️ Improvements"
+        
+        # 获取改进提交
+        git log ${PREV_TAG}..${{ github.sha }} --pretty=format:"- %s" --grep="improve:" --grep="update:" --grep="enhance:" | head -5 | while read line; do
+          if [ ! -z "$line" ]; then
+            CHANGELOG="${CHANGELOG}\n${line}"
+          fi
+        done
+        
+        CHANGELOG="${CHANGELOG}\n\n### 📊 Statistics"
+        COMMIT_COUNT=$(git rev-list --count ${PREV_TAG}..${{ github.sha }})
+        CHANGELOG="${CHANGELOG}\n- 📝 ${COMMIT_COUNT} commits since ${PREV_TAG}"
+        
+        FILES_CHANGED=$(git diff --name-only ${PREV_TAG}..${{ github.sha }} | wc -l)
+        CHANGELOG="${CHANGELOG}\n- 📁 ${FILES_CHANGED} files changed"
+        
+        CHANGELOG="${CHANGELOG}\n\n---"
+        CHANGELOG="${CHANGELOG}\n**Full Changelog**: https://github.com/${{ github.repository }}/compare/${PREV_TAG}...${{ steps.version.outputs.tag }}"
+        
+        echo "changelog<<EOF" >> $GITHUB_OUTPUT
+        echo -e "$CHANGELOG" >> $GITHUB_OUTPUT
+        echo "EOF" >> $GITHUB_OUTPUT
+
+  # Build Release Assets
+  build-assets:
+    name: 🏗️ Build Release Assets
+    runs-on: ubuntu-latest
+    needs: prepare-release
+    
+    strategy:
+      matrix:
+        target: [web, docker]
+        
+    steps:
+    - name: 📂 Checkout Repository
+      uses: actions/checkout@v4
+      
+    - name: ⚙️ Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+        
+    - name: 📦 Install Dependencies
+      run: npm ci
+      
+    - name: 🗄️ Generate Prisma Client
+      run: npx prisma generate
+      
+    - name: 🏗️ Build Web Assets
+      if: matrix.target == 'web'
+      run: |
+        echo "Building web application..."
+        npm run build
+        npm run deploy:build
+        
+        # 创建部署包
+        mkdir -p release-assets
+        tar -czf release-assets/ai-galaxy-web-${{ needs.prepare-release.outputs.version }}.tar.gz \
+          .next public package.json next.config.js prisma
+          
+        # 创建源码包
+        git archive --format=tar.gz --prefix=ai-galaxy-${{ needs.prepare-release.outputs.version }}/ \
+          ${{ github.sha }} > release-assets/ai-galaxy-source-${{ needs.prepare-release.outputs.version }}.tar.gz
+        
+    - name: 🐳 Build Docker Assets
+      if: matrix.target == 'docker'
+      run: |
+        echo "Building Docker images..."
+        
+        # 设置Docker Buildx
+        docker buildx create --use
+        
+        # 构建多架构镜像
+        docker buildx build \
+          --platform linux/amd64,linux/arm64 \
+          --file ./deploy/docker/Dockerfile \
+          --tag ai-galaxy:${{ needs.prepare-release.outputs.version }} \
+          --tag ai-galaxy:latest \
+          --build-arg VERSION=${{ needs.prepare-release.outputs.version }} \
+          --build-arg BUILD_DATE=$(date -u +'%Y-%m-%dT%H:%M:%SZ') \
+          --build-arg VCS_REF=${{ github.sha }} \
+          --output type=docker,dest=release-assets/ai-galaxy-docker-${{ needs.prepare-release.outputs.version }}.tar \
+          .
+          
+    - name: 📊 Generate Build Report
+      run: |
+        mkdir -p release-assets
+        
+        cat > release-assets/build-report-${{ matrix.target }}.md << EOF
+        # Build Report - ${{ matrix.target }}
+        
+        ## Build Information
+        - **Version:** ${{ needs.prepare-release.outputs.version }}
+        - **Target:** ${{ matrix.target }}
+        - **Build Date:** $(date)
+        - **Commit:** ${{ github.sha }}
+        - **Node Version:** ${{ env.NODE_VERSION }}
+        
+        ## Build Environment
+        - **OS:** $(uname -s)
+        - **Architecture:** $(uname -m)
+        - **Runner:** ${{ runner.os }}
+        
+        ## Assets Generated
+        EOF
+        
+        ls -la release-assets/ >> release-assets/build-report-${{ matrix.target }}.md
+        
+    - name: 📤 Upload Build Assets
+      uses: actions/upload-artifact@v3
+      with:
+        name: release-assets-${{ matrix.target }}
+        path: release-assets/
+        retention-days: 30
+
+  # Create GitHub Release
+  create-release:
+    name: 📦 Create GitHub Release
+    needs: [prepare-release, build-assets]
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: 📂 Checkout Repository
+      uses: actions/checkout@v4
+      
+    - name: 📥 Download Build Assets
+      uses: actions/download-artifact@v3
+      with:
+        path: release-assets/
+        
+    - name: 📋 Prepare Release Assets
+      run: |
+        # 整理所有构建产物
+        find release-assets/ -type f -name "*.tar.gz" -o -name "*.tar" -o -name "*.md" | sort
+        
+        # 创建校验和文件
+        cd release-assets
+        find . -type f \( -name "*.tar.gz" -o -name "*.tar" \) -exec sha256sum {} \; > checksums.txt
+        cd ..
+        
+    - name: 🚀 Create Release
+      uses: softprops/action-gh-release@v1
+      with:
+        tag_name: ${{ needs.prepare-release.outputs.tag }}
+        name: AI Galaxy ${{ needs.prepare-release.outputs.version }}
+        body: ${{ needs.prepare-release.outputs.changelog }}
+        draft: ${{ github.event.inputs.release_type == 'draft' }}
+        prerelease: ${{ github.event.inputs.release_type == 'prerelease' }}
+        files: |
+          release-assets/**/*.tar.gz
+          release-assets/**/*.tar
+          release-assets/**/checksums.txt
+          release-assets/**/*.md
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # Deploy Release
+  deploy-release:
+    name: 🌐 Deploy Release
+    needs: [prepare-release, create-release]
+    uses: ./.github/workflows/docker-deploy.yml
+    if: github.event.inputs.release_type != 'draft'
+    secrets: inherit
+    with:
+      environment: production
+      image_tag: ${{ needs.prepare-release.outputs.version }}
+
+  # Post-Release Tasks
+  post-release:
+    name: 📋 Post-Release Tasks
+    needs: [prepare-release, create-release, deploy-release]
+    runs-on: ubuntu-latest
+    if: always() && needs.create-release.result == 'success'
+    
+    steps:
+    - name: 📂 Checkout Repository
+      uses: actions/checkout@v4
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+        
+    - name: 📈 Update Version in package.json
+      run: |
+        # 更新package.json版本号
+        npm version ${{ needs.prepare-release.outputs.version }} --no-git-tag-version
+        
+        # 提交版本更新
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        git add package.json package-lock.json
+        git commit -m "chore: bump version to ${{ needs.prepare-release.outputs.version }}
+
+🤖 Generated with Claude Code (https://claude.ai/code)
+
+Co-Authored-By: Claude <noreply@anthropic.com>" || true
+        git push origin main || true
+        
+    - name: 📊 Release Summary
+      run: |
+        echo "### 🎉 Release ${{ needs.prepare-release.outputs.version }} Summary" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "✅ **Release Created:** [GitHub Release](https://github.com/${{ github.repository }}/releases/tag/${{ needs.prepare-release.outputs.tag }})" >> $GITHUB_STEP_SUMMARY
+        echo "🚀 **Deployment:** ${{ needs.deploy-release.result == 'success' && '✅ Successful' || '⚠️ Check logs' }}" >> $GITHUB_STEP_SUMMARY
+        echo "📅 **Released at:** $(date)" >> $GITHUB_STEP_SUMMARY
+        echo "👤 **Released by:** ${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### 🔗 Quick Links" >> $GITHUB_STEP_SUMMARY
+        echo "- 📦 [Release Page](https://github.com/${{ github.repository }}/releases/tag/${{ needs.prepare-release.outputs.tag }})" >> $GITHUB_STEP_SUMMARY
+        echo "- 🌐 [Production Site](https://mpai.openpenpal.com)" >> $GITHUB_STEP_SUMMARY
+        echo "- 🐳 [Docker Images](https://hub.docker.com/r/yourusername/ai-galaxy)" >> $GITHUB_STEP_SUMMARY
