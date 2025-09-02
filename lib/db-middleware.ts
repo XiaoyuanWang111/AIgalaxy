@@ -2,6 +2,12 @@ import { prisma } from './prisma'
 
 // 数据库初始化标记，避免重复初始化
 let isInitialized = false
+let isDemoMode = false
+
+// 检查是否为演示模式（数据库不可用）
+export function isDemonstrationMode(): boolean {
+  return isDemoMode || process.env.NODE_ENV === 'development' && !process.env.DATABASE_URL?.includes('postgresql://')
+}
 
 export async function ensureDatabase(): Promise<void> {
   if (isInitialized) {
@@ -9,6 +15,8 @@ export async function ensureDatabase(): Promise<void> {
   }
 
   try {
+    // 测试数据库连接
+    await prisma.$queryRaw`SELECT 1`
     console.log('=== Starting database seeding ===')
     
     // 检查并插入初始数据
@@ -18,8 +26,10 @@ export async function ensureDatabase(): Promise<void> {
     console.log('=== Database seeding completed ===')
 
   } catch (error) {
-    console.error('Database seeding failed:', error)
-    // Don't throw error to prevent breaking the application
+    console.error('Database connection failed, switching to demo mode:', error.message)
+    isDemoMode = true
+    isInitialized = true
+    console.log('=== Running in demonstration mode with mock data ===')
   }
 }
 

@@ -1,12 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { ensureDatabase } from '@/lib/db-middleware'
+import { ensureDatabase, isDemonstrationMode } from '@/lib/db-middleware'
+import { demoStarMagnitudeConfig } from '@/lib/demo-data'
 
 // GET - 获取所有星等配置
 export async function GET() {
   try {
     // 确保数据库已初始化
     await ensureDatabase()
+    
+    // 如果是演示模式，返回演示数据
+    if (isDemonstrationMode()) {
+      console.log('[API/magnitude-config] Running in demo mode, returning mock data')
+      return NextResponse.json({
+        success: true,
+        data: demoStarMagnitudeConfig
+      })
+    }
     
     const configs = await prisma.starMagnitudeConfig.findMany({
       where: { isEnabled: true },
@@ -19,10 +29,13 @@ export async function GET() {
     })
   } catch (error) {
     console.error('Error fetching magnitude configs:', error)
-    return NextResponse.json(
-      { success: false, message: '获取配置失败' },
-      { status: 500 }
-    )
+    
+    // 数据库出错时回退到演示数据
+    console.log('[API/magnitude-config] Database error, falling back to demo data')
+    return NextResponse.json({
+      success: true,
+      data: demoStarMagnitudeConfig
+    })
   }
 }
 

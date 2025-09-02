@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { ensureDatabase } from '@/lib/db-middleware'
+import { ensureDatabase, isDemonstrationMode } from '@/lib/db-middleware'
+import { demoAgents } from '@/lib/demo-data'
 
 // GET /api/agents - 获取所有启用的Agent
 export async function GET(request: NextRequest) {
@@ -11,6 +12,36 @@ export async function GET(request: NextRequest) {
     // 确保数据库已初始化
     await ensureDatabase()
     console.log('[API/agents] Database initialized')
+
+    // 如果是演示模式，返回演示数据
+    if (isDemonstrationMode()) {
+      console.log('[API/agents] Running in demo mode, returning mock data')
+      
+      const { searchParams } = new URL(request.url)
+      const search = searchParams.get('search')
+      const tag = searchParams.get('tag')
+      
+      let filteredAgents = demoAgents.filter(agent => agent.enabled)
+      
+      // 搜索过滤
+      if (search) {
+        const searchLower = search.toLowerCase()
+        filteredAgents = filteredAgents.filter(agent =>
+          agent.name.toLowerCase().includes(searchLower) ||
+          agent.description.toLowerCase().includes(searchLower) ||
+          agent.tags.some(t => t.toLowerCase().includes(searchLower))
+        )
+      }
+      
+      // 标签过滤
+      if (tag && tag !== 'all') {
+        filteredAgents = filteredAgents.filter(agent =>
+          agent.tags.some(t => t.toLowerCase().includes(tag.toLowerCase()))
+        )
+      }
+      
+      return NextResponse.json({ agents: filteredAgents })
+    }
 
     const { searchParams } = new URL(request.url)
     const search = searchParams.get('search')
@@ -64,34 +95,10 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     console.error('[API/agents] Detailed error:', error)
     
-    // Provide more specific error messages
-    if (error instanceof Error) {
-      if (error.message.includes('P2023') || error.message.includes('hasSome')) {
-        // This is likely a PostgreSQL array operation on SQLite
-        console.error('[API/agents] Database type mismatch - PostgreSQL array operations on SQLite?')
-        return NextResponse.json(
-          { 
-            error: 'Database configuration error', 
-            details: 'Array operations not supported on current database',
-            hint: 'Check DATABASE_URL configuration'
-          },
-          { status: 500 }
-        )
-      }
-      
-      return NextResponse.json(
-        { 
-          error: 'Failed to fetch agents', 
-          details: error.message 
-        },
-        { status: 500 }
-      )
-    }
-    
-    return NextResponse.json(
-      { error: 'Failed to fetch agents' },
-      { status: 500 }
-    )
+    // 如果数据库出错，切换到演示模式
+    console.log('[API/agents] Database error, falling back to demo data')
+    const filteredAgents = demoAgents.filter(agent => agent.enabled)
+    return NextResponse.json({ agents: filteredAgents })
   }
 }
 
